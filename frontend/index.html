@@ -15,33 +15,49 @@
         }
 
         :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --primary-light: #dbeafe;
+            --primary: #f97316;
+            --primary-dark: #ea580c;
+            --primary-deep: #c2410c;
+            --primary-light: #ffedd5;
+            --accent: #0ea5e9;
+            --accent-light: #e0f2fe;
             --success: #16a34a;
             --warning: #f59e0b;
-            --danger: #dc2626;
-            --bg: #f8fafc;
+            --danger: #ef4444;
+            --bg: #fffaf6;
             --card-bg: #ffffff;
-            --text: #1e293b;
-            --text-secondary: #64748b;
-            --border: #e2e8f0;
-            --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-            --shadow-lg: 0 10px 25px rgba(0,0,0,0.1), 0 4px 10px rgba(0,0,0,0.06);
-            --radius: 12px;
-            --radius-sm: 8px;
+            --text: #292524;
+            --text-secondary: #8a8178;
+            --border: #f5e9dd;
+            --shadow: 0 1px 3px rgba(120, 60, 20, 0.06), 0 4px 12px rgba(120, 60, 20, 0.05);
+            --shadow-lg: 0 18px 40px rgba(154, 94, 34, 0.16), 0 6px 16px rgba(154, 94, 34, 0.08);
+            --radius: 18px;
+            --radius-sm: 12px;
             --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
         }
 
         body {
             font-family: var(--font);
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+            background: linear-gradient(160deg, #fff7ed 0%, #fef3c7 45%, #ecfeff 100%);
             color: var(--text);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             padding: 0;
-            line-height: 1.6;
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(560px 320px at 8% 6%, rgba(251, 146, 60, 0.16), transparent 62%),
+                radial-gradient(520px 320px at 92% 18%, rgba(14, 165, 233, 0.14), transparent 62%),
+                radial-gradient(640px 400px at 50% 108%, rgba(244, 63, 94, 0.12), transparent 65%);
         }
 
         /* 移动端容器：最大宽度 414px */
@@ -53,18 +69,32 @@
             display: flex;
             flex-direction: column;
             box-shadow: var(--shadow-lg);
+            position: relative;
+            z-index: 1;
         }
 
         /* ============================================================
            顶部标题栏
            ============================================================ */
         .header {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #06b6d4 100%);
+            background: linear-gradient(135deg, #fbbf24 0%, #f97316 50%, #f43f5e 100%);
             color: white;
-            padding: 20px 16px 24px;
+            padding: 28px 16px 30px;
             text-align: center;
             position: relative;
             overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 70%);
+            top: -90px;
+            right: -60px;
+            pointer-events: none;
         }
 
         .header::after {
@@ -73,15 +103,23 @@
             bottom: -1px;
             left: 0;
             right: 0;
-            height: 20px;
+            height: 24px;
             background: var(--bg);
-            border-radius: 20px 20px 0 0;
+            border-radius: 24px 24px 0 0;
         }
 
         .header-icon {
-            font-size: 42px;
-            display: block;
-            margin-bottom: 6px;
+            font-size: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 68px;
+            height: 68px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(190, 60, 20, 0.25);
             animation: float 3s ease-in-out infinite;
         }
 
@@ -91,15 +129,17 @@
         }
 
         .header h1 {
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 21px;
+            font-weight: 800;
             letter-spacing: 1px;
+            text-shadow: 0 2px 8px rgba(190, 60, 20, 0.25);
         }
 
         .header .subtitle {
             font-size: 13px;
-            opacity: 0.85;
-            margin-top: 2px;
+            opacity: 0.92;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
         }
 
         /* ============================================================
@@ -107,10 +147,10 @@
            ============================================================ */
         .main-content {
             flex: 1;
-            padding: 16px;
+            padding: 18px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 16px;
         }
 
         /* ============================================================
@@ -122,8 +162,8 @@
 
         .city-selector select {
             width: 100%;
-            padding: 11px 36px 11px 14px;
-            border: 2px solid var(--border);
+            padding: 12px 36px 12px 15px;
+            border: 1.5px solid var(--border);
             border-radius: var(--radius-sm);
             font-size: 15px;
             color: var(--text);
@@ -131,7 +171,8 @@
             appearance: none;
             -webkit-appearance: none;
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-shadow: var(--shadow);
             font-family: var(--font);
         }
 
@@ -142,42 +183,40 @@
         }
 
         /* ============================================================
-           检索方式选择器
+           检索方式切换
            ============================================================ */
-        .method-selector {
-            position: relative;
+        .method-toggle {
+            display: flex;
+            gap: 6px;
+            padding: 5px;
+            background: #fff1e6;
+            border: 1px solid var(--border);
+            border-radius: 14px;
         }
 
-        .method-selector select {
-            width: 100%;
-            padding: 9px 36px 9px 14px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius-sm);
-            font-size: 13px;
+        .method-option {
+            flex: 1;
+            padding: 9px 10px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
             color: var(--text-secondary);
-            background: var(--card-bg);
-            appearance: none;
-            -webkit-appearance: none;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
             font-family: var(--font);
+            white-space: nowrap;
         }
 
-        .method-selector select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px var(--primary-light);
+        .method-option.active {
+            background: var(--card-bg);
+            color: var(--primary-dark);
+            box-shadow: 0 2px 8px rgba(120, 60, 20, 0.14);
         }
 
-        .method-selector::after {
-            content: '▾';
-            position: absolute;
-            right: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            color: var(--text-secondary);
-            font-size: 13px;
+        .method-option:not(.active):hover {
+            color: var(--primary);
         }
 
         .city-selector::after {
@@ -206,66 +245,72 @@
 
         .input-wrapper input {
             width: 100%;
-            padding: 12px 14px;
-            border: 2px solid var(--border);
+            padding: 13px 15px;
+            border: 1.5px solid var(--border);
             border-radius: var(--radius-sm);
             font-size: 15px;
             color: var(--text);
             background: var(--card-bg);
             transition: border-color 0.2s, box-shadow 0.2s;
+            box-shadow: var(--shadow);
             font-family: var(--font);
         }
 
         .input-wrapper input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px var(--primary-light);
+            box-shadow: 0 0 0 3px var(--primary-light), var(--shadow);
         }
 
         .input-wrapper input::placeholder {
-            color: #94a3b8;
+            color: #b9a99b;
         }
 
         .btn {
-            padding: 12px 20px;
+            padding: 13px 20px;
             border: none;
-            border-radius: var(--radius-sm);
+            border-radius: 14px;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.22s ease;
             font-family: var(--font);
             white-space: nowrap;
         }
 
         .btn-primary {
-            background: var(--primary);
+            background: linear-gradient(135deg, #fb923c 0%, #f97316 55%, #ea580c 100%);
             color: white;
+            box-shadow: 0 6px 16px rgba(234, 88, 12, 0.28);
         }
 
         .btn-primary:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(234, 88, 12, 0.34);
+            filter: brightness(1.04);
         }
 
         .btn-primary:active:not(:disabled) {
-            transform: translateY(0);
+            transform: translateY(0) scale(0.98);
         }
 
         .btn-primary:disabled {
-            background: #94a3b8;
+            background: #e7e5e4;
+            color: #a8a29e;
+            box-shadow: none;
             cursor: not-allowed;
         }
 
         .btn-outline {
             background: var(--card-bg);
             color: var(--text-secondary);
-            border: 2px solid var(--border);
+            border: 1.5px solid var(--border);
         }
 
         .btn-outline:hover {
-            background: #f1f5f9;
+            background: #faf5ef;
+            border-color: #eadfd2;
+            color: var(--text);
         }
 
         .btn-row {
@@ -283,22 +328,25 @@
         }
 
         .quick-tag {
-            padding: 7px 14px;
+            padding: 8px 15px;
             background: var(--card-bg);
             border: 1.5px solid var(--border);
-            border-radius: 20px;
+            border-radius: 999px;
             font-size: 13px;
             color: var(--text-secondary);
             cursor: pointer;
             transition: all 0.2s;
             user-select: none;
             white-space: nowrap;
+            box-shadow: var(--shadow);
         }
 
         .quick-tag:hover {
             border-color: var(--primary);
             color: var(--primary);
-            background: var(--primary-light);
+            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(234, 88, 12, 0.14);
         }
 
         .quick-tag:active {
@@ -312,10 +360,14 @@
             display: none;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            padding: 20px;
+            gap: 12px;
+            padding: 18px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             color: var(--text-secondary);
             font-size: 14px;
+            box-shadow: var(--shadow);
         }
 
         .loading-indicator.active {
@@ -323,9 +375,9 @@
         }
 
         .spinner {
-            width: 22px;
-            height: 22px;
-            border: 3px solid var(--border);
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--primary-light);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 0.7s linear infinite;
@@ -340,9 +392,9 @@
            ============================================================ */
         .answer-card {
             display: none;
-            background: var(--card-bg);
+            background: linear-gradient(180deg, #ffffff 0%, #fffdfa 100%);
             border-radius: var(--radius);
-            padding: 18px;
+            padding: 20px;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
         }
@@ -360,65 +412,76 @@
         .answer-header {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            font-weight: 700;
+            gap: 10px;
+            margin-bottom: 14px;
+            font-weight: 800;
             font-size: 16px;
-            color: var(--primary);
+            color: var(--primary-dark);
         }
 
-        .answer-header .icon { font-size: 20px; }
+        .answer-header .icon {
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            background: var(--primary-light);
+            border-radius: 11px;
+        }
 
         .answer-body {
-            font-size: 14px;
-            line-height: 1.8;
+            font-size: 14.5px;
+            line-height: 1.85;
             color: var(--text);
             white-space: pre-wrap;
             word-break: break-word;
         }
 
-        .answer-body h1, .answer-body h2 { font-size: 16px; margin: 10px 0 6px; }
-        .answer-body h3 { font-size: 15px; margin: 8px 0 4px; }
-        .answer-body ul, .answer-body ol { padding-left: 20px; margin: 6px 0; }
-        .answer-body li { margin: 3px 0; }
+        .answer-body h1, .answer-body h2 { font-size: 16px; margin: 12px 0 6px; color: var(--primary-dark); }
+        .answer-body h3 { font-size: 15px; margin: 10px 0 4px; }
+        .answer-body ul, .answer-body ol { padding-left: 20px; margin: 8px 0; }
+        .answer-body li { margin: 4px 0; }
 
         .answer-footer {
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border);
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px dashed var(--border);
         }
 
         .answer-footer .meta {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            line-height: 1.9;
         }
 
         .sources-title {
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         .source-item {
             display: inline-block;
-            padding: 4px 10px;
+            padding: 5px 11px;
             margin: 3px 6px 3px 0;
-            background: #f0f9ff;
-            border-radius: 6px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 999px;
             font-size: 12px;
-            color: #0369a1;
+            color: #c2410c;
         }
 
         .source-item .city-badge {
             display: inline-block;
-            padding: 1px 6px;
-            background: #dbeafe;
-            border-radius: 4px;
-            margin-left: 4px;
+            padding: 1px 7px;
+            background: var(--primary-light);
+            border-radius: 999px;
+            margin-left: 5px;
             font-size: 11px;
-            color: #1d4ed8;
+            color: var(--primary-dark);
         }
 
         /* ============================================================
@@ -427,23 +490,27 @@
         .message-box {
             display: none;
             padding: 14px 16px;
-            border-radius: var(--radius-sm);
+            border-radius: 14px;
             font-size: 14px;
             text-align: center;
+            line-height: 1.7;
         }
 
-        .message-box.visible { display: block; }
+        .message-box.visible {
+            display: block;
+            animation: fadeIn 0.25s ease-out;
+        }
 
         .message-box.error {
             background: #fef2f2;
-            color: #991b1b;
+            color: #b91c1c;
             border: 1px solid #fecaca;
         }
 
         .message-box.info {
-            background: #f0f9ff;
-            color: #075985;
-            border: 1px solid #bae6fd;
+            background: #fff7ed;
+            color: #c2410c;
+            border: 1px solid #fed7aa;
         }
 
         .message-box.warning {
@@ -452,26 +519,38 @@
             border: 1px solid #fde68a;
         }
 
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .retry-btn {
             display: inline-block;
             margin-top: 8px;
-            padding: 6px 16px;
+            padding: 7px 18px;
             background: white;
             border: 1px solid currentColor;
-            border-radius: 6px;
+            border-radius: 999px;
             color: inherit;
             cursor: pointer;
             font-size: 13px;
+            font-weight: 600;
             font-family: var(--font);
+            transition: all 0.2s;
+        }
+
+        .retry-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(120, 60, 20, 0.12);
         }
 
         /* ============================================================
            已覆盖城市面板
            ============================================================ */
         .city-panel {
-            background: var(--card-bg);
+            background: linear-gradient(180deg, #ffffff 0%, #fffaf5 100%);
             border-radius: var(--radius);
-            padding: 16px;
+            padding: 18px;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
         }
@@ -479,33 +558,45 @@
         .city-panel h3 {
             font-size: 14px;
             color: var(--text-secondary);
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            font-weight: 700;
         }
 
         .city-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 10px;
         }
 
         .city-card {
-            padding: 10px;
-            background: #f8fafc;
-            border-radius: var(--radius-sm);
+            padding: 12px 8px;
+            background: #fff8f0;
+            border-radius: 14px;
             cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
+            transition: all 0.22s;
+            border: 1.5px solid transparent;
             text-align: center;
         }
 
         .city-card:hover {
-            border-color: var(--primary);
-            background: var(--primary-light);
+            border-color: #fdba74;
+            background: #fff1e6;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 18px rgba(234, 88, 12, 0.12);
         }
 
-        .city-card .city-emoji { font-size: 24px; display: block; margin-bottom: 2px; }
-        .city-card .city-name { font-size: 13px; font-weight: 600; color: var(--text); }
-        .city-card .city-tag { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+        .city-card:active { transform: scale(0.96); }
+
+        .city-card .city-emoji {
+            font-size: 26px;
+            display: block;
+            margin-bottom: 4px;
+            transition: transform 0.2s;
+        }
+
+        .city-card:hover .city-emoji { transform: scale(1.18) rotate(-6deg); }
+        .city-card .city-name { font-size: 13px; font-weight: 700; color: var(--text); }
+        .city-card .city-tag { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 
         /* ============================================================
            问答历史面板
@@ -514,7 +605,7 @@
             display: none;
             background: var(--card-bg);
             border-radius: var(--radius);
-            padding: 16px;
+            padding: 18px;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
         }
@@ -524,62 +615,83 @@
         .history-panel h3 {
             font-size: 14px;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            font-weight: 700;
         }
 
         .history-item {
-            padding: 8px 0;
-            border-bottom: 1px solid #f1f5f9;
+            padding: 10px 0;
+            border-bottom: 1px solid #faf3ea;
             cursor: pointer;
             transition: background 0.15s;
         }
 
-        .history-item:hover { background: #f8fafc; }
+        .history-item:hover { background: #fdf6ee; }
 
         .history-item .h-q {
-            font-size: 13px;
+            font-size: 13.5px;
             color: var(--text);
-            font-weight: 500;
+            font-weight: 600;
         }
 
         .history-item .h-meta {
             font-size: 11px;
             color: var(--text-secondary);
-            margin-top: 2px;
+            margin-top: 3px;
         }
 
         /* ============================================================
            底部
            ============================================================ */
         .footer {
-            padding: 12px 16px;
+            padding: 14px 16px 18px;
             text-align: center;
-            font-size: 11px;
+            font-size: 11.5px;
             color: var(--text-secondary);
             border-top: 1px solid var(--border);
+            background: linear-gradient(180deg, transparent 0%, rgba(255, 237, 213, 0.35) 100%);
         }
 
-        .footer a { color: var(--primary); text-decoration: none; }
+        .footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
 
         /* ============================================================
            响应式：大屏居中
            ============================================================ */
         @media (min-width: 415px) {
             body {
-                padding: 20px;
+                padding: 24px 20px;
                 align-items: flex-start;
             }
             .app-container {
                 min-height: auto;
-                border-radius: 20px;
+                border-radius: 24px;
                 overflow: hidden;
-                margin-top: 10px;
+                margin-top: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.65);
             }
         }
 
         /* 高屏设备 */
         @media (min-height: 800px) and (min-width: 415px) {
             body { align-items: center; }
+        }
+
+        /* ============================================================
+           全局细节：滚动条、选中、键盘焦点
+           ============================================================ */
+        html { scroll-behavior: smooth; }
+
+        ::selection { background: #fed7aa; color: #7c2d12; }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #e7d5c3; border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d9bfa7; }
+
+        button:focus-visible,
+        select:focus-visible,
+        input:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
         }
     </style>
 </head>
@@ -602,12 +714,10 @@
                 </select>
             </div>
 
-            <!-- 检索方式选择 -->
-            <div class="method-selector">
-                <select id="method-select" aria-label="选择检索方式">
-                    <option value="bm25">BM25 检索（默认）</option>
-                    <option value="keyword">关键词匹配</option>
-                </select>
+            <!-- 检索方式切换 -->
+            <div class="method-toggle" id="method-toggle" role="group" aria-label="选择检索方式">
+                <button type="button" class="method-option active" data-method="bm25">BM25 检索</button>
+                <button type="button" class="method-option" data-method="keyword">关键词匹配</button>
             </div>
 
             <!-- 搜索输入 -->
@@ -684,7 +794,7 @@ const API_BASE = window.location.origin.startsWith('http')
 
     // DOM 元素
     const citySelect = document.getElementById('city-select');
-    const methodSelect = document.getElementById('method-select');
+    const methodToggle = document.getElementById('method-toggle');
     const questionInput = document.getElementById('question-input');
     const askBtn = document.getElementById('ask-btn');
     const clearBtn = document.getElementById('clear-btn');
@@ -698,6 +808,7 @@ const API_BASE = window.location.origin.startsWith('http')
 
     // 状态
     let abortController = null;
+    let currentMethod = 'bm25';
     const HISTORY_KEY = 'travel_qa_history';
     const MAX_HISTORY = 20;
 
@@ -786,6 +897,14 @@ const API_BASE = window.location.origin.startsWith('http')
     function bindEvents() {
         // 提问按钮
         askBtn.addEventListener('click', () => askQuestion());
+
+        // 检索方式切换
+        methodToggle.addEventListener('click', (e) => {
+            const btn = e.target.closest('.method-option');
+            if (!btn) return;
+            currentMethod = btn.dataset.method;
+            methodToggle.querySelectorAll('.method-option').forEach(b => b.classList.toggle('active', b === btn));
+        });
 
         // 回车键提问
         questionInput.addEventListener('keydown', (e) => {
@@ -921,7 +1040,7 @@ const API_BASE = window.location.origin.startsWith('http')
                     question: question,
                     city: city,
                     top_k: 5,
-                    method: methodSelect.value
+                    method: currentMethod
                 }),
                 signal: abortController.signal,
             });
