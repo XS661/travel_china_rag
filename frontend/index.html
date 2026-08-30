@@ -141,6 +141,45 @@
             box-shadow: 0 0 0 3px var(--primary-light);
         }
 
+        /* ============================================================
+           检索方式选择器
+           ============================================================ */
+        .method-selector {
+            position: relative;
+        }
+
+        .method-selector select {
+            width: 100%;
+            padding: 9px 36px 9px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            font-family: var(--font);
+        }
+
+        .method-selector select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .method-selector::after {
+            content: '▾';
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
         .city-selector::after {
             content: '▾';
             position: absolute;
@@ -563,6 +602,14 @@
                 </select>
             </div>
 
+            <!-- 检索方式选择 -->
+            <div class="method-selector">
+                <select id="method-select" aria-label="选择检索方式">
+                    <option value="bm25">BM25 检索（默认）</option>
+                    <option value="keyword">关键词匹配</option>
+                </select>
+            </div>
+
             <!-- 搜索输入 -->
             <div class="input-area">
                 <div class="input-wrapper">
@@ -637,6 +684,7 @@ const API_BASE = window.location.origin.startsWith('http')
 
     // DOM 元素
     const citySelect = document.getElementById('city-select');
+    const methodSelect = document.getElementById('method-select');
     const questionInput = document.getElementById('question-input');
     const askBtn = document.getElementById('ask-btn');
     const clearBtn = document.getElementById('clear-btn');
@@ -873,7 +921,7 @@ const API_BASE = window.location.origin.startsWith('http')
                     question: question,
                     city: city,
                     top_k: 5,
-                    method: 'bm25'
+                    method: methodSelect.value
                 }),
                 signal: abortController.signal,
             });

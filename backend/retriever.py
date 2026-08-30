@@ -24,8 +24,8 @@ _city_knowledge_cache: dict[str, list[dict]] | None = None
 # BM25 相关缓存
 _bm25_corpus: list[list[str]] | None = None
 _bm25_index: BM25Okapi | None = None
-# 倒排索引缓存
-_inverted_index: dict[str, set[int]] | None = None
+# 倒排索引缓存（按候选集缓存：key 为城市名或 "__all__"，避免跨城市复用错索引）
+_inverted_index_cache: dict[str, dict[str, set[int]]] = {}
 # jieba 分词词典初始化标志
 _jieba_initialized: bool = False
 
@@ -121,23 +121,24 @@ def _init_bm25(entries: list[dict]) -> tuple[list[list[str]], BM25Okapi]:
     return _bm25_corpus, _bm25_index
 
 
-def _init_inverted_index(entries: list[dict]) -> dict[str, set[int]]:
-    """构建倒排索引（若尚未初始化）"""
-    global _inverted_index
-    if _inverted_index is not None:
-        return _inverted_index
+def _init_inverted_index(entries: list[dict], cache_key: str = "__all__") -> dict[str, set[int]]:
+    """构建倒排索引（按候选集缓存，不同城市互不污染）"""
+    global _inverted_index_cache
+    if cache_key in _inverted_index_cache:
+        return _inverted_index_cache[cache_key]
 
     _init_jieba()
-    _inverted_index = {}
+    index: dict[str, set[int]] = {}
     for idx, entry in enumerate(entries):
         text = _build_search_text(entry)
         tokens = set(jieba.cut(text))
         for token in tokens:
-            if token not in _inverted_index:
-                _inverted_index[token] = set()
-            _inverted_index[token].add(idx)
+            if token not in index:
+                index[token] = set()
+            index[token].add(idx)
 
-    return _inverted_index
+    _inverted_index_cache[cache_key] = index
+    return index
 
 
 # ============================================================
@@ -166,15 +167,18 @@ def search_keyword(
         return []
 
     # 城市过滤
+    cache_key = "__all__"
     if city and city in COVERED_CITIES:
         candidates = [e for e in all_entries if e.get("city") == city]
         if not candidates:
             candidates = all_entries  # fallback to all
+        else:
+            cache_key = city
     else:
         candidates = all_entries
 
-    # 构建倒排索引
-    inverted = _init_inverted_index(candidates)
+    # 构建倒排索引（按候选集缓存，不同城市互不污染）
+    inverted = _init_inverted_index(candidates, cache_key)
 
     # 对问题分词
     question_tokens = list(jieba.cut(question))
