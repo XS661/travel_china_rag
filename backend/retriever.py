@@ -1,8 +1,10 @@
 """
 检索模块
-实现两种检索方案：
+实现四种检索方案：
 - 方案A：jieba 分词 + 关键词匹配 + 倒排索引
 - 方案B：BM25 检索（rank-bm25）
+- 方案C：文本向量相似度检索（sentence-transformers 稠密向量）
+- 方案D：BM25 + 文本向量的混合检索（加权融合）
 支持城市过滤，优先匹配指定城市的知识片段
 """
 
@@ -12,6 +14,7 @@ from pathlib import Path
 
 import jieba
 from rank_bm25 import BM25Okapi
+import numpy as np
 
 from city_detector import COVERED_CITIES, CITY_TAGS, _load_city_metadata
 
@@ -26,6 +29,12 @@ _bm25_corpus: list[list[str]] | None = None
 _bm25_index: BM25Okapi | None = None
 # 倒排索引缓存（按候选集缓存：key 为城市名或 "__all__"，避免跨城市复用错索引）
 _inverted_index_cache: dict[str, dict[str, set[int]]] = {}
+# 向量检索相关缓存
+_vector_model = None
+_vector_corpus: np.ndarray | None = None
+_vector_status: str = "not_loaded"  # not_loaded / ready / unavailable
+_VECTOR_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5")
+_VECTOR_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章："
 # jieba 分词词典初始化标志
 _jieba_initialized: bool = False
 
@@ -274,6 +283,204 @@ def search_bm25(
 
 
 # ============================================================
+# 方案 C：文本向量相似度检索（sentence-transformers）
+# ============================================================
+
+def get_vector_status() -> str:
+    """返回向量检索可用状态：not_loaded / ready / unavailable"""
+    return _vector_status
+
+
+def _init_vector_index(entries: list[dict]) -> np.ndarray | None:
+    """懒加载向量模型并对全部条目编码（首次调用会下载模型）"""
+    global _vector_model, _vector_corpus, _vector_status
+    if _vector_corpus is not None:
+        return _vector_corpus
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:
+        _vector_status = "unavailable"
+        print("[WARNING] sentence-transformers 未安装，向量检索不可用")
+        return None
+    try:
+        if _vector_model is None:
+            print(f"[INFO] 加载向量模型: {_VECTOR_MODEL_NAME} ...")
+            # local_files_only：模型已缓存时绝不联网校验，避免网络不通导致长时间挂起
+            _vector_model = SentenceTransformer(_VECTOR_MODEL_NAME, local_files_only=True)
+        texts = [_build_search_text(entry) for entry in entries]
+        vectors = _vector_model.encode(
+            texts,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+            batch_size=32,
+        )
+        _vector_corpus = np.asarray(vectors, dtype=np.float32)
+        _vector_status = "ready"
+        print(f"[INFO] 向量索引构建完成：共 {len(entries)} 条，维度 {_vector_corpus.shape[1]}")
+    except Exception as e:
+        _vector_status = "unavailable"
+        print(f"[WARNING] 向量模型加载失败：{e}")
+        print(
+            "[HINT] 首次使用需先下载模型（国内网络可先设置 "
+            "HF_ENDPOINT=https://hf-mirror.com 或配置代理）："
+            f"python -c \"from sentence_transformers import SentenceTransformer; "
+            f"SentenceTransformer('{_VECTOR_MODEL_NAME}')\""
+        )
+        return None
+    return _vector_corpus
+
+
+def _embed_query(question: str) -> np.ndarray | None:
+    """对用户问题编码（bge 模型需加检索指令前缀）"""
+    try:
+        if _vector_model is None:
+            return None
+        vec = _vector_model.encode(
+            _VECTOR_QUERY_PREFIX + question,
+            normalize_embeddings=True,
+        )
+        return np.asarray(vec, dtype=np.float32)
+    except Exception as e:
+        print(f"[WARNING] 问题编码失败：{e}")
+        return None
+
+
+def _apply_city_boost(
+    scored: list[tuple[float, dict]],
+    city: str | None,
+    city_boost: float,
+) -> list[tuple[float, dict]]:
+    """城市加权：匹配城市加权，其他城市降权"""
+    boosted = []
+    for score, entry in scored:
+        if city and entry.get("city") == city:
+            score *= city_boost
+        elif city:
+            score *= 0.5
+        boosted.append((score, entry))
+    return boosted
+
+
+def search_vector(
+    question: str,
+    city: str | None = None,
+    top_k: int = 5,
+    city_boost: float = 1.5,
+) -> list[dict]:
+    """
+    文本向量相似度检索（稠密向量余弦相似度）
+
+    Args:
+        question: 用户问题
+        city: 限定城市（None 表示全库搜索，但匹配城市会有加权）
+        top_k: 返回 Top-K 结果
+        city_boost: 城市匹配加权系数（仅当 city 非空时生效）
+
+    Returns:
+        检索结果列表；向量模型不可用时返回空列表
+    """
+    all_entries = load_knowledge_base()
+    if not all_entries:
+        return []
+
+    corpus = _init_vector_index(all_entries)
+    if corpus is None:
+        return []
+
+    q_vec = _embed_query(question)
+    if q_vec is None:
+        return []
+
+    sims = corpus @ q_vec
+    scored_entries = _apply_city_boost(
+        [(float(sims[idx]), entry) for idx, entry in enumerate(all_entries)],
+        city,
+        city_boost,
+    )
+    scored_entries.sort(key=lambda x: x[0], reverse=True)
+
+    results = []
+    for score, entry in scored_entries[:top_k]:
+        result = dict(entry)
+        result["score"] = round(score, 4)
+        results.append(result)
+    return results
+
+
+# ============================================================
+# 方案 D：BM25 + 文本向量混合检索（加权融合）
+# ============================================================
+
+def search_hybrid(
+    question: str,
+    city: str | None = None,
+    top_k: int = 5,
+    w_bm25: float = 0.5,
+    w_vector: float = 0.5,
+    city_boost: float = 1.5,
+) -> list[dict]:
+    """
+    BM25 + 文本向量混合检索
+
+    将 BM25 分数归一化到 [0,1] 后与向量余弦相似度加权求和。
+    向量模型不可用时自动降级为纯 BM25。
+
+    Args:
+        question: 用户问题
+        city: 限定城市
+        top_k: 返回 Top-K 结果
+        w_bm25: BM25 权重（默认 0.5）
+        w_vector: 向量相似度权重（默认 0.5）
+        city_boost: 城市匹配加权系数
+
+    Returns:
+        检索结果列表
+    """
+    _init_jieba()
+    all_entries = load_knowledge_base()
+    if not all_entries:
+        return []
+
+    _init_bm25(all_entries)
+    question_tokens = list(jieba.cut(question))
+    bm25_scores = _bm25_index.get_scores(question_tokens)
+
+    corpus = _init_vector_index(all_entries)
+    if corpus is None:
+        print("[INFO] 向量模型不可用，混合检索降级为 BM25")
+        return search_bm25(question, city=city, top_k=top_k, city_boost=city_boost)
+
+    q_vec = _embed_query(question)
+    if q_vec is None:
+        return search_bm25(question, city=city, top_k=top_k, city_boost=city_boost)
+
+    # BM25 分数 min-max 归一化到 [0,1]
+    bm25_min = float(np.min(bm25_scores))
+    bm25_max = float(np.max(bm25_scores))
+    if bm25_max > bm25_min:
+        bm25_norm = (bm25_scores - bm25_min) / (bm25_max - bm25_min)
+    else:
+        bm25_norm = np.zeros_like(bm25_scores)
+
+    vec_scores = corpus @ q_vec
+    fused = w_bm25 * bm25_norm + w_vector * vec_scores
+
+    scored_entries = _apply_city_boost(
+        [(float(fused[idx]), entry) for idx, entry in enumerate(all_entries)],
+        city,
+        city_boost,
+    )
+    scored_entries.sort(key=lambda x: x[0], reverse=True)
+
+    results = []
+    for score, entry in scored_entries[:top_k]:
+        result = dict(entry)
+        result["score"] = round(score, 4)
+        results.append(result)
+    return results
+
+
+# ============================================================
 # 统一检索接口
 # ============================================================
 
@@ -290,15 +497,57 @@ def search_knowledge(
         question: 用户问题
         city: 限定城市
         top_k: 返回 Top-K 结果
-        method: 检索方法 ("keyword" 或 "bm25")
+        method: 检索方法 ("keyword" / "bm25" / "vector" / "hybrid")
 
     Returns:
         检索结果列表
     """
     if method == "keyword":
         return search_keyword(question, city=city, top_k=top_k)
-    else:
-        return search_bm25(question, city=city, top_k=top_k)
+    if method == "vector":
+        return search_vector(question, city=city, top_k=top_k)
+    if method == "hybrid":
+        return search_hybrid(question, city=city, top_k=top_k)
+    return search_bm25(question, city=city, top_k=top_k)
+
+
+def compare_methods(
+    question: str,
+    city: str | None = None,
+    top_k: int = 3,
+) -> list[dict]:
+    """运行全部检索方式，返回带耗时与状态的对比结果"""
+    import time
+
+    methods = [
+        ("keyword", "关键词匹配"),
+        ("bm25", "BM25"),
+        ("vector", "向量相似度"),
+        ("hybrid", "BM25+向量"),
+    ]
+
+    results = []
+    for method, label in methods:
+        start = time.perf_counter()
+        entries = []
+        status = "ok"
+        try:
+            entries = search_knowledge(question, city=city, top_k=top_k, method=method)
+            if method in ("vector", "hybrid") and get_vector_status() == "unavailable":
+                status = "unavailable"
+                entries = []
+        except Exception as e:
+            status = "error"
+            print(f"[WARNING] 检索方式 {method} 执行失败：{e}")
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        results.append({
+            "method": method,
+            "label": label,
+            "status": status,
+            "latency_ms": latency_ms,
+            "results": entries,
+        })
+    return results
 
 
 def get_city_info() -> list[dict]:

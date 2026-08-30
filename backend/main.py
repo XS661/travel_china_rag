@@ -40,7 +40,8 @@ class AskRequest(BaseModel):
     question: str = Field(..., description="用户问题", min_length=1, max_length=500)
     city: str | None = Field(default=None, description="用户选择的城市")
     top_k: int = Field(default=5, description="检索返回数量", ge=1, le=10)
-    method: str = Field(default="bm25", description="检索方法：keyword 或 bm25")
+    method: str = Field(default="bm25", description="检索方法：keyword / bm25 / vector / hybrid")
+    raw: bool = Field(default=False, description="true 时只返回检索结果（含分数），不调用 LLM")
 
 
 class Source(BaseModel):
@@ -48,6 +49,7 @@ class Source(BaseModel):
     title: str
     source: str
     city: str
+    score: float | None = None
 
 
 class AskResponse(BaseModel):
@@ -99,12 +101,14 @@ async def startup():
 async def health():
     """健康检查"""
     from retriever import load_knowledge_base
+    from retriever import get_vector_status
 
     entries = load_knowledge_base()
     return {
         "status": "ok",
         "knowledge_count": len(entries),
         "covered_cities": COVERED_CITIES,
+        "vector_retrieval": get_vector_status(),
     }
 
 
@@ -151,7 +155,7 @@ async def ask_question(req: AskRequest):
     )
 
     # 4. 检索无结果 → 返回提示
-    if not search_results:
+    if not search_results and not req.raw:
         return AskResponse(
             question=question,
             detected_city=detected_city,
@@ -164,7 +168,27 @@ async def ask_question(req: AskRequest):
             model="none",
         )
 
-    # 5. LLM 调用（含异常降级）
+    # 5. 原始检索模式（对比模式使用）：只返回检索结果，不调用 LLM
+    if req.raw:
+        return AskResponse(
+            question=question,
+            detected_city=detected_city,
+            answer="",
+            sources=[
+                Source(
+                    id=r.get("id", ""),
+                    title=r.get("title", ""),
+                    source=r.get("source", ""),
+                    city=r.get("city", ""),
+                    score=r.get("score"),
+                )
+                for r in search_results
+            ],
+            retrieval_method=method,
+            model="none",
+        )
+
+    # 6. LLM 调用（含异常降级）
     model_used = DEEPSEEK_MODEL
     try:
         answer = call_llm(question, search_results, timeout=30)
@@ -178,13 +202,14 @@ async def ask_question(req: AskRequest):
         answer = fallback_format(search_results)
         model_used = "fallback"
 
-    # 6. 构造来源列表
+    # 7. 构造来源列表
     sources = [
         Source(
             id=r.get("id", ""),
             title=r.get("title", ""),
             source=r.get("source", ""),
             city=r.get("city", ""),
+            score=r.get("score"),
         )
         for r in search_results
     ]
@@ -209,6 +234,13 @@ FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 @app.get("/")
 async def index():
     """返回前端首页"""
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/compare")
+@app.get("/compare/")
+async def compare_page():
+    """对比模式页面：与首页同一前端，前端根据路径自动开启对比模式"""
     return FileResponse(FRONTEND_DIR / "index.html")
 
 

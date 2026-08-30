@@ -186,7 +186,8 @@
            检索方式切换
            ============================================================ */
         .method-toggle {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 6px;
             padding: 5px;
             background: #fff1e6;
@@ -195,13 +196,12 @@
         }
 
         .method-option {
-            flex: 1;
-            padding: 9px 10px;
+            padding: 9px 8px;
             border: none;
             border-radius: 10px;
             background: transparent;
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -217,6 +217,179 @@
 
         .method-option:not(.active):hover {
             color: var(--primary);
+        }
+
+        .method-toggle.dimmed {
+            opacity: 0.55;
+        }
+
+        .compare-banner {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 12px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            border: 1px solid #7dd3fc;
+            color: #0369a1;
+            font-size: 12.5px;
+            font-weight: 700;
+            box-shadow: var(--shadow);
+        }
+
+        .compare-banner.visible {
+            display: flex;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        /* ============================================================
+           检索方式对比面板
+           ============================================================ */
+        .compare-card {
+            display: none;
+            background: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+            border-radius: var(--radius);
+            padding: 18px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .compare-card.visible {
+            display: block;
+            animation: slideUp 0.32s ease-out;
+        }
+
+        .compare-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+            font-weight: 800;
+            font-size: 15px;
+            color: #0369a1;
+        }
+
+        .compare-city {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            background: var(--accent-light);
+            color: #0369a1;
+            border-radius: 999px;
+        }
+
+        .compare-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .compare-method {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            min-width: 0;
+        }
+
+        .compare-method.disabled {
+            opacity: 0.65;
+        }
+
+        .compare-name {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 10px;
+        }
+
+        .compare-time {
+            font-size: 11px;
+            font-weight: 600;
+            color: #0369a1;
+            background: var(--accent-light);
+            padding: 1px 7px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .compare-status.unavailable {
+            font-size: 11px;
+            color: #b91c1c;
+            background: #fef2f2;
+            padding: 1px 7px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .compare-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .compare-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            line-height: 1.4;
+            padding: 6px 8px;
+            background: #f8fafc;
+            border-radius: 9px;
+            min-width: 0;
+        }
+
+        .ci-rank {
+            flex: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 5px;
+            background: var(--primary-light);
+            color: var(--primary-deep);
+            font-size: 10px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ci-title {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text);
+        }
+
+        .ci-city {
+            flex: none;
+            font-size: 10px;
+            color: var(--primary-dark);
+            background: var(--primary-light);
+            border-radius: 999px;
+            padding: 1px 6px;
+        }
+
+        .ci-score {
+            flex: none;
+            font-size: 10px;
+            font-weight: 700;
+            color: #64748b;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .compare-empty {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 12px 0;
         }
 
         .city-selector::after {
@@ -716,9 +889,14 @@
 
             <!-- 检索方式切换 -->
             <div class="method-toggle" id="method-toggle" role="group" aria-label="选择检索方式">
-                <button type="button" class="method-option active" data-method="bm25">BM25 检索</button>
-                <button type="button" class="method-option" data-method="keyword">关键词匹配</button>
+                <button type="button" class="method-option active" data-method="bm25">BM25</button>
+                <button type="button" class="method-option" data-method="keyword">关键词</button>
+                <button type="button" class="method-option" data-method="vector">向量</button>
+                <button type="button" class="method-option" data-method="hybrid">混合</button>
             </div>
+
+            <!-- 对比模式提示 -->
+            <div class="compare-banner" id="compare-banner">⚖️ 对比模式 · 四种检索方式对比</div>
 
             <!-- 搜索输入 -->
             <div class="input-area">
@@ -761,6 +939,9 @@
                 <div class="answer-footer" id="answer-footer"></div>
             </div>
 
+            <!-- 检索方式对比 -->
+            <div class="compare-card" id="compare-card"></div>
+
             <!-- 城市覆盖面板 -->
             <div class="city-panel">
                 <h3>💡 已覆盖城市（点击快速体验）</h3>
@@ -795,6 +976,7 @@ const API_BASE = window.location.origin.startsWith('http')
     // DOM 元素
     const citySelect = document.getElementById('city-select');
     const methodToggle = document.getElementById('method-toggle');
+    const compareBanner = document.getElementById('compare-banner');
     const questionInput = document.getElementById('question-input');
     const askBtn = document.getElementById('ask-btn');
     const clearBtn = document.getElementById('clear-btn');
@@ -803,14 +985,22 @@ const API_BASE = window.location.origin.startsWith('http')
     const answerCard = document.getElementById('answer-card');
     const answerBody = document.getElementById('answer-body');
     const answerFooter = document.getElementById('answer-footer');
+    const compareCard = document.getElementById('compare-card');
     const historyPanel = document.getElementById('history-panel');
     const historyList = document.getElementById('history-list');
 
     // 状态
     let abortController = null;
     let currentMethod = 'bm25';
+    let compareMode = location.pathname.includes('/compare');
     const HISTORY_KEY = 'travel_qa_history';
     const MAX_HISTORY = 20;
+
+    // 对比模式：仅通过 /compare 地址进入
+    if (compareMode) {
+        compareBanner.classList.add('visible');
+        methodToggle.classList.add('dimmed');
+    }
 
     // ========== 初始化 ==========
     async function init() {
@@ -976,6 +1166,46 @@ const API_BASE = window.location.origin.startsWith('http')
         answerCard.classList.remove('visible');
     }
 
+    function hideCompare() {
+        compareCard.classList.remove('visible');
+    }
+
+    function showCompare(data) {
+        let html = '<div class="compare-head">⚖️ 检索方式对比';
+        if (data.detected_city) {
+            html += ` <span class="compare-city">${data.detected_city}</span>`;
+        }
+        html += '</div><div class="compare-grid">';
+
+        data.methods.forEach(m => {
+            const badge = m.status === 'ok'
+                ? `<span class="compare-time">${m.latency_ms}ms</span>`
+                : `<span class="compare-status unavailable">${m.status === 'unavailable' ? '模型不可用' : '出错'}</span>`;
+            html += `<div class="compare-method${m.status !== 'ok' ? ' disabled' : ''}">`;
+            html += `<div class="compare-name">${m.label} ${badge}</div>`;
+            if (m.results.length === 0) {
+                html += '<div class="compare-empty">无结果</div>';
+            } else {
+                html += '<div class="compare-list">';
+                m.results.forEach((r, i) => {
+                    html += `<div class="compare-item">
+                        <span class="ci-rank">${i + 1}</span>
+                        <span class="ci-title">${r.title || ''}</span>
+                        <span class="ci-city">${r.city || ''}</span>
+                        <span class="ci-score">${Number(r.score).toFixed(3)}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        });
+
+        html += '</div>';
+        compareCard.innerHTML = html;
+        compareCard.classList.add('visible');
+        compareCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
     function showAnswer(data) {
         // 答案正文
         answerBody.textContent = data.answer;
@@ -1000,6 +1230,67 @@ const API_BASE = window.location.origin.startsWith('http')
         answerCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
+    // ========== 对比模式：分别请求四种检索方式 ==========
+    async function runCompare(question, city) {
+        const methods = [
+            { method: 'keyword', label: '关键词匹配' },
+            { method: 'bm25', label: 'BM25' },
+            { method: 'vector', label: '向量相似度' },
+            { method: 'hybrid', label: 'BM25+向量' },
+        ];
+
+        let vectorStatus = 'not_loaded';
+        try {
+            const h = await fetch(`${API_BASE}/api/health`);
+            if (h.ok) {
+                vectorStatus = (await h.json()).vector_retrieval || 'not_loaded';
+            }
+        } catch (e) { /* 忽略 */ }
+
+        const out = [];
+        let detectedCity = city || null;
+        for (const m of methods) {
+            const t0 = performance.now();
+            let status = 'ok';
+            let results = [];
+            try {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        city: city,
+                        top_k: 3,
+                        method: m.method,
+                        raw: true,
+                    }),
+                    signal: abortController.signal,
+                });
+                if (!res.ok) throw new Error('http ' + res.status);
+                const data = await res.json();
+                if (!detectedCity && data.detected_city) {
+                    detectedCity = data.detected_city;
+                }
+                results = data.sources || [];
+            } catch (e) {
+                if (e.name === 'AbortError') throw e;
+                status = 'error';
+            }
+            if ((m.method === 'vector' || m.method === 'hybrid') && vectorStatus === 'unavailable') {
+                status = 'unavailable';
+                results = [];
+            }
+            out.push({
+                method: m.method,
+                label: m.label,
+                status: status,
+                latency_ms: Math.round(performance.now() - t0),
+                results: results,
+            });
+        }
+        return { question: question, detected_city: detectedCity, methods: out };
+    }
+
     // ========== 核心：提问 ==========
     async function askQuestion() {
         const question = questionInput.value.trim();
@@ -1021,6 +1312,10 @@ const API_BASE = window.location.origin.startsWith('http')
         // UI 状态
         hideMessage();
         hideAnswer();
+        hideCompare();
+        loadingEl.querySelector('span').textContent = compareMode
+            ? '正在对比四种检索方式...'
+            : '正在为你搜索和整理答案...';
         showLoading(true);
         askBtn.disabled = true;
 
@@ -1033,40 +1328,48 @@ const API_BASE = window.location.origin.startsWith('http')
         const city = citySelect.value || null;
 
         try {
-            const res = await fetch(`${API_BASE}/api/ask`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    city: city,
-                    top_k: 5,
-                    method: currentMethod
-                }),
-                signal: abortController.signal,
-            });
+            let data;
+            if (compareMode) {
+                data = await runCompare(question, city);
+            } else {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        city: city,
+                        top_k: 5,
+                        method: currentMethod
+                    }),
+                    signal: abortController.signal,
+                });
 
-            if (!res.ok) {
-                if (res.status === 400) {
-                    const errData = await res.json();
-                    throw new Error(errData.detail || '输入有误');
-                } else if (res.status === 422) {
-                    const errData = await res.json();
-                    const msg = errData.detail?.[0]?.msg || '输入格式有误';
-                    throw new Error(msg);
-                } else if (res.status >= 500) {
-                    throw new Error('服务器内部错误，请稍后重试');
+                if (!res.ok) {
+                    if (res.status === 400) {
+                        const errData = await res.json();
+                        throw new Error(errData.detail || '输入有误');
+                    } else if (res.status === 422) {
+                        const errData = await res.json();
+                        const msg = errData.detail?.[0]?.msg || '输入格式有误';
+                        throw new Error(msg);
+                    } else if (res.status >= 500) {
+                        throw new Error('服务器内部错误，请稍后重试');
+                    }
+                    throw new Error(`请求失败 (${res.status})`);
                 }
-                throw new Error(`请求失败 (${res.status})`);
+                data = await res.json();
             }
 
-            const data = await res.json();
-            showAnswer(data);
-            saveToHistory(question, data);
-
-            // 显示历史面板
-            if (getHistory().length > 0) {
-                renderHistory();
-                historyPanel.classList.add('visible');
+            if (compareMode) {
+                showCompare(data);
+            } else {
+                showAnswer(data);
+                saveToHistory(question, data);
+                // 显示历史面板
+                if (getHistory().length > 0) {
+                    renderHistory();
+                    historyPanel.classList.add('visible');
+                }
             }
 
         } catch (err) {
@@ -1093,6 +1396,7 @@ const API_BASE = window.location.origin.startsWith('http')
         questionInput.value = '';
         citySelect.value = '';
         hideAnswer();
+        hideCompare();
         hideMessage();
     }
 
