@@ -279,79 +279,99 @@
             border-radius: 999px;
         }
 
-        .compare-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .compare-method {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 12px;
-            min-width: 0;
-        }
-
-        .compare-method.disabled {
-            opacity: 0.65;
-        }
-
-        .compare-name {
+        .compare-summary {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 6px;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--text);
+            flex-wrap: wrap;
+            gap: 8px;
             margin-bottom: 10px;
         }
 
-        .compare-time {
-            font-size: 11px;
-            font-weight: 600;
-            color: #0369a1;
-            background: var(--accent-light);
-            padding: 1px 7px;
+        .cs-item {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: #f8fafc;
+            border: 1px solid var(--border);
             border-radius: 999px;
-            white-space: nowrap;
+            padding: 4px 10px;
         }
 
-        .compare-status.unavailable {
-            font-size: 11px;
-            color: #b91c1c;
-            background: #fef2f2;
-            padding: 1px 7px;
-            border-radius: 999px;
-            white-space: nowrap;
+        .cs-item b {
+            color: var(--primary-dark);
         }
 
-        .compare-list {
+        .compare-chips {
             display: flex;
-            flex-direction: column;
+            flex-wrap: wrap;
             gap: 6px;
+            margin-bottom: 14px;
         }
 
-        .compare-item {
+        .cc-chip {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 999px;
+            color: white;
+        }
+
+        .cc-chip.cc-bad {
+            background: #fca5a5;
+        }
+
+        .cc-keyword { background: #64748b; }
+        .cc-bm25 { background: #2563eb; }
+        .cc-vector { background: #ea580c; }
+        .cc-hybrid { background: #16a34a; }
+
+        .cm-table {
+            display: grid;
+            grid-template-columns: minmax(0, 2.1fr) repeat(4, minmax(0, 1fr));
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .cm-row {
+            display: contents;
+        }
+
+        .cm-head .cm-source,
+        .cm-head .cm-col {
+            background: #f1f5f9;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 8px 4px;
+            border-top: none;
+        }
+
+        .cm-head .cm-source {
+            text-align: left;
+            padding-left: 10px;
+        }
+
+        .cm-source,
+        .cm-col {
+            padding: 8px 6px;
+            border-top: 1px solid var(--border);
+            min-width: 0;
+        }
+
+        .cm-source {
             display: flex;
             align-items: center;
             gap: 6px;
             font-size: 11.5px;
-            line-height: 1.4;
-            padding: 6px 8px;
-            background: #f8fafc;
-            border-radius: 9px;
-            min-width: 0;
+            color: var(--text);
         }
 
-        .ci-rank {
+        .cm-src-rank {
             flex: none;
-            width: 16px;
-            height: 16px;
+            width: 15px;
+            height: 15px;
             border-radius: 5px;
-            background: var(--primary-light);
-            color: var(--primary-deep);
+            background: #e2e8f0;
+            color: #475569;
             font-size: 10px;
             font-weight: 700;
             display: inline-flex;
@@ -359,37 +379,76 @@
             justify-content: center;
         }
 
-        .ci-title {
+        .cm-title {
             flex: 1;
             min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            color: var(--text);
         }
 
-        .ci-city {
+        .cm-city {
             flex: none;
-            font-size: 10px;
+            font-size: 9.5px;
             color: var(--primary-dark);
             background: var(--primary-light);
             border-radius: 999px;
-            padding: 1px 6px;
+            padding: 1px 5px;
         }
 
-        .ci-score {
-            flex: none;
-            font-size: 10px;
+        .cm-col {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cm-rank {
+            min-width: 18px;
+            height: 18px;
+            border-radius: 6px;
+            font-size: 10.5px;
             font-weight: 700;
-            color: #64748b;
-            font-variant-numeric: tabular-nums;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
         }
 
-        .compare-empty {
+        .r-keyword { background: #64748b; }
+        .r-bm25 { background: #2563eb; }
+        .r-vector { background: #ea580c; }
+        .r-hybrid { background: #16a34a; }
+
+        .cm-miss {
+            color: #cbd5e1;
             font-size: 12px;
-            color: var(--text-secondary);
+        }
+
+        .cm-shared .cm-source {
+            background: #fff7ed;
+        }
+
+        .cm-shared .cm-col {
+            background: #fffbeb;
+        }
+
+        .cm-empty {
+            padding: 16px;
             text-align: center;
-            padding: 12px 0;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .compare-legend {
+            margin-top: 10px;
+            font-size: 10.5px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .lg-shared {
+            color: var(--primary-deep);
+            font-weight: 700;
         }
 
         .city-selector::after {
@@ -1171,36 +1230,90 @@ const API_BASE = window.location.origin.startsWith('http')
     }
 
     function showCompare(data) {
+        const METHODS = [
+            { method: 'keyword', label: '关键词' },
+            { method: 'bm25', label: 'BM25' },
+            { method: 'vector', label: '向量' },
+            { method: 'hybrid', label: '混合' },
+        ];
+
+        // 按来源 id 聚合四种方式的召回
+        const byId = new Map();
+        data.methods.forEach(m => {
+            if (m.status !== 'ok') return;
+            m.results.forEach((r, idx) => {
+                const id = r.id || r.title || '';
+                if (!byId.has(id)) {
+                    byId.set(id, { id: id, title: r.title || '', city: r.city || '', foundBy: [] });
+                }
+                byId.get(id).foundBy.push({ method: m.method, rank: idx + 1 });
+            });
+        });
+        const sources = Array.from(byId.values());
+        sources.forEach(s => {
+            s.bestRank = Math.min(...s.foundBy.map(f => f.rank));
+            s.foundCount = s.foundBy.length;
+        });
+        // 被越多方式召回越靠前，其次看最佳名次
+        sources.sort((a, b) => (b.foundCount - a.foundCount) || (a.bestRank - b.bestRank));
+
+        // 摘要：Top1 一致性
+        const okMethods = data.methods.filter(m => m.status === 'ok' && m.results.length > 0);
+        const top1Counts = {};
+        okMethods.forEach(m => {
+            const id = m.results[0].id || m.results[0].title || '';
+            top1Counts[id] = (top1Counts[id] || 0) + 1;
+        });
+        const top1Best = Math.max(0, ...Object.values(top1Counts));
+
         let html = '<div class="compare-head">⚖️ 检索方式对比';
         if (data.detected_city) {
             html += ` <span class="compare-city">${data.detected_city}</span>`;
         }
-        html += '</div><div class="compare-grid">';
+        html += '</div>';
 
+        html += '<div class="compare-summary">';
+        html += `<span class="cs-item">召回来源 <b>${sources.length}</b> 条</span>`;
+        if (okMethods.length > 0) {
+            html += `<span class="cs-item">Top1 一致 <b>${top1Best}/${okMethods.length}</b></span>`;
+        }
+        html += '</div>';
+
+        html += '<div class="compare-chips">';
         data.methods.forEach(m => {
-            const badge = m.status === 'ok'
-                ? `<span class="compare-time">${m.latency_ms}ms</span>`
-                : `<span class="compare-status unavailable">${m.status === 'unavailable' ? '模型不可用' : '出错'}</span>`;
-            html += `<div class="compare-method${m.status !== 'ok' ? ' disabled' : ''}">`;
-            html += `<div class="compare-name">${m.label} ${badge}</div>`;
-            if (m.results.length === 0) {
-                html += '<div class="compare-empty">无结果</div>';
-            } else {
-                html += '<div class="compare-list">';
-                m.results.forEach((r, i) => {
-                    html += `<div class="compare-item">
-                        <span class="ci-rank">${i + 1}</span>
-                        <span class="ci-title">${r.title || ''}</span>
-                        <span class="ci-city">${r.city || ''}</span>
-                        <span class="ci-score">${Number(r.score).toFixed(3)}</span>
-                    </div>`;
+            const text = m.status === 'ok'
+                ? `${m.label} ${m.latency_ms}ms`
+                : `${m.label} ${m.status === 'unavailable' ? '不可用' : '出错'}`;
+            html += `<span class="cc-chip ${m.status === 'ok' ? 'cc-' + m.method : 'cc-bad'}">${text}</span>`;
+        });
+        html += '</div>';
+
+        html += '<div class="cm-table">';
+        html += '<div class="cm-row cm-head"><div class="cm-source">来源</div>';
+        METHODS.forEach(m => { html += `<div class="cm-col">${m.label}</div>`; });
+        html += '</div>';
+
+        if (sources.length === 0) {
+            html += '<div class="cm-empty">无召回结果</div>';
+        } else {
+            sources.forEach((s, idx) => {
+                html += `<div class="cm-row${s.foundCount > 1 ? ' cm-shared' : ''}">`;
+                html += `<div class="cm-source"><span class="cm-src-rank">${idx + 1}</span><span class="cm-title" title="${s.title}">${s.title}</span><span class="cm-city">${s.city}</span></div>`;
+                METHODS.forEach(m => {
+                    const f = s.foundBy.find(x => x.method === m.method);
+                    if (!f) {
+                        html += '<div class="cm-col"><span class="cm-miss">—</span></div>';
+                    } else {
+                        html += `<div class="cm-col"><span class="cm-rank r-${m.method}">${f.rank}</span></div>`;
+                    }
                 });
                 html += '</div>';
-            }
-            html += '</div>';
-        });
-
+            });
+        }
         html += '</div>';
+
+        html += '<div class="compare-legend">数字＝该方式中的名次 · —＝未召回 · <span class="lg-shared">高亮行</span>＝多种方式共同召回</div>';
+
         compareCard.innerHTML = html;
         compareCard.classList.add('visible');
         compareCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
