@@ -35,6 +35,7 @@ app.add_middleware(
 # 请求/响应模型
 # ============================================================
 
+
 class AskRequest(BaseModel):
     question: str = Field(..., description="用户问题", min_length=1, max_length=500)
     city: str | None = Field(default=None, description="用户选择的城市")
@@ -77,10 +78,12 @@ class KnowledgePage(BaseModel):
 # 启动事件
 # ============================================================
 
+
 @app.on_event("startup")
 async def startup():
     """启动时预加载知识库"""
     from retriever import load_knowledge_base
+
     entries = load_knowledge_base()
     print(f"[启动] 知识库已加载，共 {len(entries)} 条记录")
     cities = set(e.get("city", "") for e in entries)
@@ -91,10 +94,12 @@ async def startup():
 # API 路由
 # ============================================================
 
+
 @app.get("/api/health")
 async def health():
     """健康检查"""
     from retriever import load_knowledge_base
+
     entries = load_knowledge_base()
     return {
         "status": "ok",
@@ -118,7 +123,9 @@ async def browse_knowledge(
     page_size: int = 20,
 ) -> KnowledgePage:
     """分页浏览知识库条目"""
-    result = get_knowledge_page(city=city, category=category, page=page, page_size=page_size)
+    result = get_knowledge_page(
+        city=city, category=category, page=page, page_size=page_size
+    )
     return KnowledgePage(**result)
 
 
@@ -211,4 +218,5 @@ async def index():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
