@@ -586,6 +586,7 @@ async function askQuestion() {
 
     // UI 状态
     hideToast();
+    els.questionInput.value = '';
     els.compareCard.hidden = true;
     showTyping(compareMode ? 'compare' : 'normal');
     els.askBtn.disabled = true;

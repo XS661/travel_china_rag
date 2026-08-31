@@ -505,14 +505,16 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
+            line-height: 1.2;
         }
 
         .ai-name {
-            font-size: 12px;
+            font-size: 15px;
             font-weight: 800;
             color: var(--cyan);
-            letter-spacing: 0.5px;
+            letter-spacing: 0.2px;
+            line-height: 1.2;
         }
 
         .ai-time {
