@@ -66,6 +66,8 @@ def _ensure_storage() -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS contributions (
             id TEXT PRIMARY KEY,
+            user_id TEXT,
+            username TEXT,
             city TEXT NOT NULL,
             title TEXT,
             category TEXT,
@@ -82,6 +84,15 @@ def _ensure_storage() -> None:
             updated_at TEXT NOT NULL
         )
         """)
+
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(contributions)").fetchall()
+    }
+    if "user_id" not in columns:
+        conn.execute("ALTER TABLE contributions ADD COLUMN user_id TEXT")
+    if "username" not in columns:
+        conn.execute("ALTER TABLE contributions ADD COLUMN username TEXT")
+
     conn.commit()
     conn.close()
 
@@ -107,6 +118,8 @@ def save_submission(
     source_type: str = "text",
     file_name: str | None = None,
     notes: str = "",
+    user_id: str | None = None,
+    username: str | None = None,
 ) -> dict:
     _ensure_storage()
     submission_id = str(uuid.uuid4())
@@ -116,12 +129,14 @@ def save_submission(
     conn.execute(
         """
         INSERT INTO contributions (
-            id, city, title, category, sub_category, source, source_type, file_name,
+            id, user_id, username, city, title, category, sub_category, source, source_type, file_name,
             content, notes, status, review_note, approved_entry, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', ?, ?)
         """,
         (
             submission_id,
+            user_id,
+            username or "",
             city.strip(),
             title.strip(),
             category.strip(),
@@ -158,14 +173,56 @@ def get_submission(submission_id: str) -> dict | None:
     return item
 
 
-def list_submissions(status: str | None = None) -> list[dict]:
+def get_user_submission(user_id: str, submission_id: str) -> dict | None:
     _ensure_storage()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    if status:
+    row = conn.execute(
+        "SELECT * FROM contributions WHERE id = ? AND user_id = ?",
+        (submission_id, user_id),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    item = dict(row)
+    item["approved_entry"] = (
+        json.loads(item["approved_entry"]) if item["approved_entry"] else None
+    )
+    return item
+
+
+def delete_user_submission(user_id: str, submission_id: str) -> bool:
+    _ensure_storage()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.execute(
+        "DELETE FROM contributions WHERE id = ? AND user_id = ?",
+        (submission_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+    return cursor.rowcount > 0
+
+
+def list_submissions(
+    status: str | None = None, user_id: str | None = None
+) -> list[dict]:
+    _ensure_storage()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    if status and user_id:
+        rows = conn.execute(
+            "SELECT * FROM contributions WHERE status = ? AND user_id = ? ORDER BY created_at DESC",
+            (status, user_id),
+        ).fetchall()
+    elif status:
         rows = conn.execute(
             "SELECT * FROM contributions WHERE status = ? ORDER BY created_at DESC",
             (status,),
+        ).fetchall()
+    elif user_id:
+        rows = conn.execute(
+            "SELECT * FROM contributions WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
         ).fetchall()
     else:
         rows = conn.execute(

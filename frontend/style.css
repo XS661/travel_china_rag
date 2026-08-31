@@ -259,56 +259,21 @@
             filter: brightness(1.08);
         }
 
-        .status-pill {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 5px 10px;
+        .user-home-btn {
+            border: 1px solid rgba(63, 217, 255, 0.35);
+            background: rgba(63, 217, 255, 0.1);
+            color: #a5efff;
+            padding: 6px 10px;
             border-radius: 999px;
-            border: 1px solid var(--stroke);
-            background: rgba(255, 255, 255, 0.04);
             font-size: 11px;
-            color: var(--dim);
-            transition: border-color 0.25s;
+            font-weight: 700;
+            font-family: var(--font-ui);
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .status-pill .dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--faint);
-            transition: background 0.25s, box-shadow 0.25s;
-        }
-
-        .status-pill.online .dot {
-            background: var(--ok);
-            box-shadow: 0 0 9px var(--ok);
-            animation: pulse 2.2s ease-in-out infinite;
-        }
-
-        .status-pill.online {
-            color: var(--ok);
-        }
-
-        .status-pill.offline .dot {
-            background: var(--err);
-            box-shadow: 0 0 9px var(--err);
-        }
-
-        .status-pill.offline {
-            color: var(--err);
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.35;
-            }
+        .user-home-btn:hover {
+            filter: brightness(1.08);
         }
 
         .icon-btn {
@@ -350,17 +315,35 @@
             padding: 18px 15px 12px;
         }
 
-        .chat-scroll::-webkit-scrollbar {
-            width: 6px;
+        .chat-scroll,
+        .user-home-list {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
         }
 
-        .chat-scroll::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 6px;
+        .chat-scroll::-webkit-scrollbar,
+        .user-home-list::-webkit-scrollbar {
+            width: 8px;
         }
 
-        .chat-scroll::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .chat-scroll::-webkit-scrollbar-track,
+        .user-home-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-scroll::-webkit-scrollbar-thumb,
+        .user-home-list::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(148, 163, 184, 0.38), rgba(110, 124, 146, 0.6));
+            border: 2px solid transparent;
+            background-clip: padding-box;
+            border-radius: 999px;
+            transition: background 0.2s ease;
+        }
+
+        .chat-scroll::-webkit-scrollbar-thumb:hover,
+        .user-home-list::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(164, 180, 204, 0.55), rgba(122, 138, 162, 0.75));
+            background-clip: padding-box;
         }
 
         /* ============================================================
@@ -1385,6 +1368,176 @@
         /* ============================================================
            历史抽屉（底部弹出）
            ============================================================ */
+        .user-home-panel {
+            position: absolute;
+            inset: 74px 10px 100px 10px;
+            z-index: 18;
+            background: rgba(11, 17, 31, 0.96);
+            border: 1px solid var(--stroke);
+            border-radius: 22px;
+            padding: 16px 14px 14px;
+            box-shadow: var(--shadow-1);
+            overflow: hidden;
+        }
+
+        .user-home-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--stroke);
+        }
+
+        .user-home-label {
+            font-size: 11px;
+            color: var(--dim);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .user-home-header h3 {
+            margin-top: 4px;
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .user-home-list {
+            overflow-y: auto;
+            max-height: calc(100% - 52px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 2px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+        }
+
+        .user-home-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .user-home-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .user-home-list::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(148, 163, 184, 0.38), rgba(110, 124, 146, 0.6));
+            border: 2px solid transparent;
+            background-clip: padding-box;
+            border-radius: 999px;
+        }
+
+        .user-home-list::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(164, 180, 204, 0.55), rgba(122, 138, 162, 0.75));
+            background-clip: padding-box;
+        }
+
+        .user-post-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--stroke);
+            border-radius: 16px;
+            padding: 12px 12px 10px;
+        }
+
+        .post-topline,
+        .post-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            color: var(--dim);
+            font-size: 11px;
+        }
+
+        .post-city {
+            color: #bfe9ff;
+            font-weight: 700;
+        }
+
+        .user-post-card h4 {
+            font-size: 15px;
+            margin: 10px 0 8px;
+        }
+
+        .user-post-card p {
+            color: #dfe9f8;
+            font-size: 12.5px;
+            line-height: 1.7;
+        }
+
+        .post-meta {
+            margin-top: 10px;
+            font-size: 10.5px;
+            color: var(--dim);
+        }
+
+        .home-empty {
+            color: var(--dim);
+            text-align: center;
+            padding: 28px 12px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .user-post-detail {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--stroke);
+            border-radius: 16px;
+            padding: 12px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .back-link {
+            width: fit-content;
+            border: none;
+            background: transparent;
+            color: var(--cyan);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .post-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--dim);
+            font-size: 11px;
+        }
+
+        .post-detail-source {
+            font-size: 11px;
+            color: var(--dim);
+        }
+
+        .post-detail-body {
+            background: rgba(10, 17, 29, 0.6);
+            border: 1px solid var(--stroke);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 13px;
+            line-height: 1.8;
+            color: #ebf3ff;
+            white-space: pre-wrap;
+        }
+
+        .post-detail-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .danger-btn {
+            border: 1px solid rgba(248, 113, 113, 0.4);
+            background: rgba(248, 113, 113, 0.08);
+            color: #f9b5b5;
+            border-radius: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
         .sheet-backdrop {
             position: absolute;
             inset: 0;

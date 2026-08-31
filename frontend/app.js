@@ -39,9 +39,12 @@ const els = {
     quickTags: $('quick-tags'),
     compareCard: $('compare-card'),
     toast: $('toast'),
-    statusPill: $('status-pill'),
-    statusLabel: $('status-label'),
     authBtn: $('auth-btn'),
+    userHomeBtn: $('user-home-btn'),
+    userHomePanel: $('user-home-panel'),
+    userHomeList: $('user-home-list'),
+    userHomeTitle: $('user-home-title'),
+    userHomeClose: $('user-home-close'),
     authModal: $('auth-modal'),
     authBackdrop: $('auth-backdrop'),
     authClose: $('auth-close'),
@@ -69,7 +72,6 @@ let currentCity = '';
 let abortController = null;
 let typingTimer = null;
 let toastTimer = null;
-let healthNotified = false;
 let authMode = 'login';
 window._cityList = []; // 全局城市名缓存，供 extractCityFromQuestion 使用
 const AUTH_TOKEN_KEY = 'travel_qa_token';
@@ -88,7 +90,6 @@ async function init() {
     loadHistory();
     bindEvents();
     setAuthUi();
-    checkHealth();
 }
 
 // ========== 从后端动态加载城市信息 ==========
@@ -257,6 +258,16 @@ function bindEvents() {
         openAuthModal();
     });
 
+    els.userHomeBtn.addEventListener('click', async () => {
+        if (!getToken()) {
+            openAuthModal();
+            setAuthStatus('请先登录后查看我的主页', 'warn');
+            return;
+        }
+        await openUserHome();
+    });
+    els.userHomeClose.addEventListener('click', closeUserHome);
+
     els.authBackdrop.addEventListener('click', closeAuthModal);
     els.authClose.addEventListener('click', closeAuthModal);
     els.authTabs.forEach(tab => {
@@ -296,11 +307,13 @@ function setAuthUi() {
     if (user && token) {
         els.authBtn.textContent = `已登录 · ${user.username}`;
         els.authBtn.title = `已登录：${user.username}`;
+        els.userHomeBtn.hidden = false;
         els.contributeToggle.disabled = false;
         localStorage.setItem(HISTORY_MODE_KEY, 'user');
     } else {
         els.authBtn.textContent = '登录';
         els.authBtn.title = '登录/注册';
+        els.userHomeBtn.hidden = true;
         els.contributeToggle.disabled = true;
         localStorage.setItem(HISTORY_MODE_KEY, 'guest');
     }
@@ -862,6 +875,9 @@ async function submitContribution() {
             els.contributeCity.value = '';
             els.contributeFile.value = '';
             els.contributePanel.hidden = true;
+            if (!els.userHomePanel.hidden) {
+                await loadUserHomePosts();
+            }
         } else {
             setContributionStatus(data.reason || '提交未通过审核', 'warn');
         }
@@ -875,6 +891,127 @@ async function submitContribution() {
 function setContributionStatus(message, type = 'info') {
     els.contributeStatus.textContent = message;
     els.contributeStatus.className = `contribute-status ${type}`;
+}
+
+async function openUserHome() {
+    const user = getCurrentUser();
+    if (!user) return;
+    els.userHomeTitle.textContent = `${user.username} 的帖子`;
+    els.userHomePanel.hidden = false;
+    await loadUserHomePosts();
+}
+
+function closeUserHome() {
+    els.userHomePanel.hidden = true;
+}
+
+async function loadUserHomePosts() {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/my-contributions`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+            if (res.status === 401) {
+                logoutUser();
+                return;
+            }
+            throw new Error('获取帖子列表失败');
+        }
+        const posts = await res.json();
+        if (!posts.length) {
+            els.userHomeList.innerHTML = '<div class="home-empty">还没有发布过心得，快去投稿吧。</div>';
+            return;
+        }
+
+        els.userHomeList.innerHTML = posts.map((post) => `
+            <article class="user-post-card" data-post-id="${escapeHtml(post.id || '')}">
+                <div class="post-topline">
+                    <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
+                    <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
+                </div>
+                <h4>${escapeHtml(post.title || '旅游心得')}</h4>
+                <p>${escapeHtml((post.content || '').slice(0, 180))}${(post.content || '').length > 180 ? '…' : ''}</p>
+                <div class="post-meta">
+                    <span>${escapeHtml(post.source || '用户亲身经历')}</span>
+                    <span>${escapeHtml(post.username || '用户')}</span>
+                </div>
+            </article>
+        `).join('');
+
+        els.userHomeList.querySelectorAll('.user-post-card').forEach((card) => {
+            card.addEventListener('click', async () => {
+                const postId = card.dataset.postId;
+                if (!postId) return;
+                await openUserPostDetail(postId);
+            });
+        });
+    } catch (err) {
+        els.userHomeList.innerHTML = '<div class="home-empty">帖子加载失败，请稍后重试。</div>';
+        console.warn(err);
+    }
+}
+
+async function openUserPostDetail(postId) {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/my-contributions/${postId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+            if (res.status === 401) {
+                logoutUser();
+                return;
+            }
+            throw new Error('获取帖子详情失败');
+        }
+        const post = await res.json();
+        els.userHomeList.innerHTML = `
+            <div class="user-post-detail">
+                <button type="button" class="back-link" data-action="back-to-list">← 返回我的主页</button>
+                <div class="post-detail-header">
+                    <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
+                    <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
+                </div>
+                <h4>${escapeHtml(post.title || '旅游心得')}</h4>
+                <div class="post-detail-source">${escapeHtml(post.source || '用户亲身经历')}</div>
+                <div class="post-detail-body">${escapeHtml(post.content || '').replace(/\n/g, '<br>')}</div>
+                <div class="post-detail-actions">
+                    <button type="button" class="danger-btn" data-action="delete-post" data-post-id="${escapeHtml(post.id || '')}">删除帖子</button>
+                </div>
+            </div>
+        `;
+
+        const backBtn = els.userHomeList.querySelector('[data-action="back-to-list"]');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => loadUserHomePosts());
+        }
+
+        const deleteBtn = els.userHomeList.querySelector('[data-action="delete-post"]');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async () => {
+                const confirmDelete = window.confirm('确定删除这篇帖子吗？');
+                if (!confirmDelete) return;
+                const deleteRes = await fetch(`${API_BASE}/api/my-contributions/${postId}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!deleteRes.ok) {
+                    showToast('删除失败', 'error');
+                    return;
+                }
+                showToast('帖子已删除', 'ok');
+                await loadUserHomePosts();
+            });
+        }
+    } catch (err) {
+        console.warn(err);
+        showToast('帖子详情加载失败', 'error');
+    }
 }
 
 function showError(text) {
@@ -892,37 +1029,6 @@ function clearAll() {
     hideTyping();
     hideToast();
     els.chatScroll.scrollTop = 0;
-}
-
-// ========== 后端健康检查 ==========
-async function checkHealth() {
-    try {
-        const res = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-            setStatus('online');
-            console.log('✅ 后端连接成功');
-        } else {
-            setStatus('offline');
-        }
-    } catch (e) {
-        setStatus('offline');
-        console.warn('⚠️ 后端未启动，请执行: cd backend && uvicorn main:app --host 0.0.0.0 --port 8000');
-        if (!healthNotified) {
-            healthNotified = true;
-            showToast('后端服务未启动<br><small>请执行：<code>cd backend &amp;&amp; uvicorn main:app --host 0.0.0.0 --port 8000</code></small>', 'warn');
-        }
-    }
-}
-
-function setStatus(s) {
-    els.statusPill.classList.remove('online', 'offline');
-    if (s === 'online') {
-        els.statusPill.classList.add('online');
-        els.statusLabel.textContent = '在线';
-    } else {
-        els.statusPill.classList.add('offline');
-        els.statusLabel.textContent = '离线';
-    }
 }
 
 // ========== 问答历史 (localStorage) ==========

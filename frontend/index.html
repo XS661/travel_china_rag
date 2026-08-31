@@ -42,11 +42,8 @@
                 </div>
             </div>
             <div class="topbar-actions">
-                <div class="status-pill" id="status-pill" title="后端连接状态">
-                    <span class="dot"></span>
-                    <span id="status-label">连接中</span>
-                </div>
                 <button type="button" class="user-pill" id="auth-btn" aria-label="登录/注册">登录</button>
+                <button type="button" class="user-home-btn" id="user-home-btn" aria-label="我的主页">我的主页</button>
                 <button type="button" class="icon-btn" id="history-btn" aria-label="问答历史" title="最近问答">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
@@ -141,6 +138,18 @@
                 </div>
             </div>
         </footer>
+
+        <!-- ========== 用户主页 ========== -->
+        <section class="user-home-panel" id="user-home-panel" hidden>
+            <div class="user-home-header">
+                <div>
+                    <div class="user-home-label">我的主页</div>
+                    <h3 id="user-home-title">我的投稿</h3>
+                </div>
+                <button type="button" class="icon-btn small" id="user-home-close" aria-label="关闭个人主页">×</button>
+            </div>
+            <div class="user-home-list" id="user-home-list"></div>
+        </section>
 
         <!-- ========== 历史抽屉 ========== -->
         <div class="sheet-backdrop" id="sheet-backdrop"></div>

@@ -1,0 +1,96 @@
+[
+  {
+    "id": "_meta",
+    "domain": "全国旅游",
+    "city": "杭州",
+    "category": "_meta",
+    "sub_category": "",
+    "title": "",
+    "content": "",
+    "keywords": [
+      "杭州"
+    ],
+    "source": "系统自动生成",
+    "source_url": "",
+    "chunk_id": 0,
+    "city_tag": "景点",
+    "aliases": [
+      "杭州"
+    ]
+  },
+  {
+    "id": "user_杭州_20260831092450_48a18a",
+    "domain": "全国旅游",
+    "city": "杭州",
+    "category": "景点",
+    "sub_category": "湖泊",
+    "title": "杭州西湖慢游",
+    "content": "从断桥走到苏堤，傍晚时分湖面安静，适合慢慢散步。",
+    "keywords": [
+      "杭州",
+      "西湖",
+      "慢游",
+      "断桥",
+      "苏堤",
+      "傍晚",
+      "时分",
+      "湖面",
+      "安静",
+      "适合"
+    ],
+    "source": "用户亲身经历",
+    "source_url": "",
+    "chunk_id": 1,
+    "city_tag": "景点"
+  },
+  {
+    "id": "user_杭州_20260831092609_1d3523",
+    "domain": "全国旅游",
+    "city": "杭州",
+    "category": "景点",
+    "sub_category": "西湖",
+    "title": "杭州西湖慢游",
+    "content": "从断桥步行至苏堤，傍晚时湖面安静，适合慢速散步。",
+    "keywords": [
+      "杭州",
+      "西湖",
+      "慢游",
+      "断桥",
+      "步行",
+      "苏堤",
+      "傍晚",
+      "湖面",
+      "安静",
+      "适合"
+    ],
+    "source": "用户亲身经历",
+    "source_url": "",
+    "chunk_id": 1,
+    "city_tag": "景点"
+  },
+  {
+    "id": "user_杭州_20260831092624_f54bd9",
+    "domain": "全国旅游",
+    "city": "杭州",
+    "category": "景点",
+    "sub_category": "自然风光",
+    "title": "杭州西湖慢游",
+    "content": "游客从断桥步行至苏堤，傍晚时西湖环境安静，适合慢速散步游览。",
+    "keywords": [
+      "杭州",
+      "西湖",
+      "慢游",
+      "游客",
+      "断桥",
+      "步行",
+      "苏堤",
+      "傍晚",
+      "环境",
+      "安静"
+    ],
+    "source": "用户亲身经历",
+    "source_url": "",
+    "chunk_id": 1,
+    "city_tag": "景点"
+  }
+]

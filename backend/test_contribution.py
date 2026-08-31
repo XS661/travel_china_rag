@@ -112,6 +112,80 @@ class AuthFlowTests(unittest.TestCase):
         self.assertEqual(len(listed.json()), 1)
         self.assertEqual(listed.json()[0]["question"], "成都怎么玩")
 
+    def test_my_contributions_are_scoped_by_user(self):
+        username = f"posts_{uuid.uuid4().hex[:6]}"
+        reg = self.client.post(
+            "/api/register",
+            json={"username": username, "password": "Secret123!"},
+        )
+        token = reg.json()["token"]
+
+        resp = self.client.post(
+            "/api/contribute",
+            data={
+                "city": "长沙",
+                "title": "长沙夜游体验",
+                "content": "我在黄兴南路附近散步，晚上可以吃麻辣小龙虾，夜景很适合拍照。",
+                "source": "用户亲身经历",
+                "source_type": "text",
+                "notes": "测试贴文",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+
+        mine = self.client.get(
+            "/api/my-contributions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(mine.status_code, 200, mine.text)
+        self.assertTrue(len(mine.json()) >= 1)
+        self.assertEqual(mine.json()[0]["city"], "长沙")
+        self.assertEqual(mine.json()[0]["username"], username)
+
+    def test_my_contribution_detail_and_delete(self):
+        username = f"detail_{uuid.uuid4().hex[:6]}"
+        reg = self.client.post(
+            "/api/register",
+            json={"username": username, "password": "Secret123!"},
+        )
+        token = reg.json()["token"]
+
+        created = self.client.post(
+            "/api/contribute",
+            data={
+                "city": "杭州",
+                "title": "杭州西湖慢游",
+                "content": "我从断桥走到苏堤，傍晚看西湖很安静，适合慢慢散步。",
+                "source": "用户亲身经历",
+                "source_type": "text",
+                "notes": "细节测试",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        post_id = created.json()["submission_id"]
+
+        detail = self.client.get(
+            f"/api/my-contributions/{post_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["city"], "杭州")
+        self.assertIn("西湖", detail.json()["content"])
+
+        deleted = self.client.delete(
+            f"/api/my-contributions/{post_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+
+        check = self.client.get(
+            f"/api/my-contributions/{post_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(check.status_code, 404, check.text)
+
 
 if __name__ == "__main__":
     unittest.main()

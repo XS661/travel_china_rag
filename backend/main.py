@@ -283,6 +283,40 @@ async def contributions(status: str | None = None):
     return list_submissions(status=status)
 
 
+@app.get("/api/my-contributions")
+async def my_contributions(current_user: dict = Depends(get_current_user)):
+    """获取当前用户自己的帖子列表"""
+    return list_submissions(user_id=current_user["id"])
+
+
+@app.get("/api/my-contributions/{submission_id}")
+async def my_contribution_detail(
+    submission_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """获取当前用户自己的某一篇帖子详情"""
+    from contribution_store import get_user_submission
+
+    item = get_user_submission(current_user["id"], submission_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="帖子不存在或不属于当前用户")
+    return item
+
+
+@app.delete("/api/my-contributions/{submission_id}")
+async def delete_my_contribution(
+    submission_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """删除当前用户自己的某一篇帖子"""
+    from contribution_store import delete_user_submission
+
+    deleted = delete_user_submission(current_user["id"], submission_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="帖子不存在或不属于当前用户")
+    return {"status": "deleted", "submission_id": submission_id}
+
+
 @app.post("/api/contribute", response_model=ContributionResponse)
 async def contribute_knowledge(
     city: str = Form(..., min_length=1, max_length=50),
@@ -319,6 +353,8 @@ async def contribute_knowledge(
         source_type=source_type,
         file_name=file_name,
         notes=notes,
+        user_id=current_user["id"],
+        username=current_user["username"],
     )
 
     review_result = review_contribution(
