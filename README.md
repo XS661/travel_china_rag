@@ -80,7 +80,7 @@
 
 | 层级               | 技术                              | 说明                          |
 | ------------------ | --------------------------------- | ----------------------------- |
-| **前端**     | HTML5 + CSS3 + JavaScript（原生） | 零框架依赖，单文件            |
+| **前端**     | HTML5 + CSS3 + JavaScript（原生） | 零框架依赖，HTML/CSS/JS 三文件分离 |
 | **移动适配** | CSS Media Query + viewport        | 414px 宽度，手机全屏          |
 | **后端框架** | FastAPI + Uvicorn                 | 高性能异步，自带 Swagger 文档 |
 | **中文分词** | jieba                             | 分词 + 关键词提取             |
@@ -116,7 +116,9 @@ travel-qa-web/
 │   ├── .env.example            # 环境变量模板
 │   └── .venv/                  # Python 虚拟环境
 └── frontend/
-    └── index.html              # 唯一前端文件（HTML + CSS + JS）
+    ├── index.html              # 页面结构（HTML）
+    ├── style.css               # 样式（深色极光玻璃拟态主题）
+    └── app.js                  # 交互逻辑（问答、城市筛选、历史记录等）
 ```
 
 ---

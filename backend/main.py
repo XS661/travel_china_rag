@@ -230,6 +230,9 @@ async def ask_question(req: AskRequest):
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
+# 静态资源托管（index.html 引用的 style.css / app.js）
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
 
 @app.get("/")
 async def index():
