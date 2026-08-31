@@ -41,6 +41,16 @@ const els = {
     toast: $('toast'),
     statusPill: $('status-pill'),
     statusLabel: $('status-label'),
+    authBtn: $('auth-btn'),
+    authModal: $('auth-modal'),
+    authBackdrop: $('auth-backdrop'),
+    authClose: $('auth-close'),
+    authForm: $('auth-form'),
+    authUsername: $('auth-username'),
+    authPassword: $('auth-password'),
+    authSubmit: $('auth-submit'),
+    authStatus: $('auth-status'),
+    authTabs: document.querySelectorAll('.auth-tab'),
     sheet: $('history-sheet'),
     sheetBackdrop: $('sheet-backdrop'),
     historyList: $('history-list'),
@@ -60,7 +70,11 @@ let abortController = null;
 let typingTimer = null;
 let toastTimer = null;
 let healthNotified = false;
+let authMode = 'login';
 window._cityList = []; // 全局城市名缓存，供 extractCityFromQuestion 使用
+const AUTH_TOKEN_KEY = 'travel_qa_token';
+const AUTH_USER_KEY = 'travel_qa_user';
+const HISTORY_MODE_KEY = 'travel_qa_history_scope';
 
 // 对比模式：仅通过 /compare 地址进入
 if (compareMode) {
@@ -73,6 +87,7 @@ async function init() {
     await loadCities();   // 先从后端加载城市列表
     loadHistory();
     bindEvents();
+    setAuthUi();
     checkHealth();
 }
 
@@ -158,9 +173,20 @@ function bindEvents() {
     // 历史抽屉
     els.historyBtn.addEventListener('click', toggleSheet);
     els.sheetBackdrop.addEventListener('click', closeSheet);
-    els.historyClear.addEventListener('click', () => {
+    els.historyClear.addEventListener('click', async () => {
+        const token = getToken();
+        if (token) {
+            try {
+                await fetch(`${API_BASE}/api/history`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+            } catch (e) {
+                console.warn('清空后端历史失败', e);
+            }
+        }
         try { localStorage.removeItem(HISTORY_KEY); } catch (e) { /* ignore */ }
-        renderHistory();
+        await renderHistory();
         showToast('问答记录已清空', 'ok');
     });
 
@@ -208,6 +234,11 @@ function bindEvents() {
 
     // 知识贡献开关
     els.contributeToggle.addEventListener('click', () => {
+        if (!getToken()) {
+            openAuthModal();
+            setAuthStatus('请先登录后再提交旅游经验', 'warn');
+            return;
+        }
         const hidden = els.contributePanel.hidden;
         els.contributePanel.hidden = !hidden;
         if (!els.contributePanel.hidden) {
@@ -216,6 +247,28 @@ function bindEvents() {
     });
 
     els.submitContribution.addEventListener('click', submitContribution);
+
+    els.authBtn.addEventListener('click', () => {
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        if (token) {
+            logoutUser();
+            return;
+        }
+        openAuthModal();
+    });
+
+    els.authBackdrop.addEventListener('click', closeAuthModal);
+    els.authClose.addEventListener('click', closeAuthModal);
+    els.authTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            authMode = tab.dataset.mode || 'login';
+            els.authTabs.forEach(item => item.classList.toggle('active', item === tab));
+            const isLogin = authMode === 'login';
+            els.authSubmit.textContent = isLogin ? '登录' : '注册';
+            setAuthStatus('');
+        });
+    });
+    els.authForm.addEventListener('submit', handleAuthSubmit);
 }
 
 function runQuickQuery(q) {
@@ -223,6 +276,96 @@ function runQuickQuery(q) {
     const city = extractCityFromQuestion(q);
     if (city) setCityFilter(city);
     askQuestion();
+}
+
+function getToken() {
+    return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function getCurrentUser() {
+    try {
+        return JSON.parse(localStorage.getItem(AUTH_USER_KEY) || 'null');
+    } catch (e) {
+        return null;
+    }
+}
+
+function setAuthUi() {
+    const user = getCurrentUser();
+    const token = getToken();
+    if (user && token) {
+        els.authBtn.textContent = `已登录 · ${user.username}`;
+        els.authBtn.title = `已登录：${user.username}`;
+        els.contributeToggle.disabled = false;
+        localStorage.setItem(HISTORY_MODE_KEY, 'user');
+    } else {
+        els.authBtn.textContent = '登录';
+        els.authBtn.title = '登录/注册';
+        els.contributeToggle.disabled = true;
+        localStorage.setItem(HISTORY_MODE_KEY, 'guest');
+    }
+}
+
+function openAuthModal() {
+    els.authModal.hidden = false;
+    els.authUsername.focus();
+}
+
+function closeAuthModal() {
+    els.authModal.hidden = true;
+    els.authForm.reset();
+    setAuthStatus('');
+}
+
+function setAuthStatus(message, type = '') {
+    els.authStatus.textContent = message;
+    els.authStatus.className = 'auth-status' + (type ? ` ${type}` : '');
+}
+
+async function handleAuthSubmit(event) {
+    event.preventDefault();
+    const username = els.authUsername.value.trim();
+    const password = els.authPassword.value.trim();
+
+    if (!username || !password) {
+        setAuthStatus('请填写用户名和密码', 'error');
+        return;
+    }
+
+    els.authSubmit.disabled = true;
+    setAuthStatus(authMode === 'login' ? '正在登录…' : '正在注册…', '');
+
+    try {
+        const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(data.detail || '认证失败');
+        }
+
+        localStorage.setItem(AUTH_TOKEN_KEY, data.token || '');
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user || { username }));
+        setAuthUi();
+        closeAuthModal();
+        showToast(authMode === 'login' ? '登录成功' : '注册成功', 'ok');
+    } catch (err) {
+        setAuthStatus(err.message || '认证失败', 'error');
+    } finally {
+        els.authSubmit.disabled = false;
+    }
+}
+
+function logoutUser() {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
+    localStorage.removeItem(HISTORY_KEY);
+    setAuthUi();
+    renderHistory();
+    showToast('已退出登录，历史已清空', 'info');
 }
 
 function setCityFilter(city) {
@@ -388,7 +531,12 @@ function pushAiMessage(data) {
     if (data.sources && data.sources.length > 0) {
         sources = '<div class="bubble-sources">';
         data.sources.forEach((src, idx) => {
-            sources += `<span class="src-chip"><i>${idx + 1}</i><span class="src-title">${escapeHtml(src.title || '')}</span>${src.city ? `<em>${escapeHtml(src.city)}</em>` : ''}</span>`;
+            const title = escapeHtml(src.title || '');
+            const sourceLabel = escapeHtml(src.source || '来源');
+            const url = (src.source_url || src.sourceUrl || '').trim();
+            const sourceText = url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="src-link" title="${sourceLabel}">${title}</a>` : `<span class="src-title">${title}</span>`;
+            const tag = src.source ? `<span class="src-source-tag" title="${sourceLabel}">${sourceLabel}</span>` : '';
+            sources += `<span class="src-chip"><i>${idx + 1}</i>${sourceText}${tag}</span>`;
         });
         sources += '</div>';
     }
@@ -677,6 +825,13 @@ async function submitContribution() {
         return;
     }
 
+    const token = getToken();
+    if (!token) {
+        openAuthModal();
+        setAuthStatus('请先登录后再提交旅游经验', 'warn');
+        return;
+    }
+
     const formData = new FormData();
     formData.append('city', city);
     formData.append('title', title || `${city}旅游体验`);
@@ -692,6 +847,7 @@ async function submitContribution() {
     try {
         const res = await fetch(`${API_BASE}/api/contribute`, {
             method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
             body: formData,
         });
         const data = await res.json();
@@ -770,7 +926,26 @@ function setStatus(s) {
 }
 
 // ========== 问答历史 (localStorage) ==========
-function getHistory() {
+async function getHistory() {
+    const token = getToken();
+    if (token) {
+        try {
+            const res = await fetch(`${API_BASE}/api/history`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                if (res.status === 401) {
+                    logoutUser();
+                    return [];
+                }
+                return [];
+            }
+            return await res.json();
+        } catch (e) {
+            return [];
+        }
+    }
+
     try {
         const raw = localStorage.getItem(HISTORY_KEY);
         return raw ? JSON.parse(raw) : [];
@@ -779,8 +954,35 @@ function getHistory() {
     }
 }
 
-function saveToHistory(question, data) {
-    const history = getHistory();
+async function saveToHistory(question, data) {
+    const token = getToken();
+    const payload = {
+        question: question,
+        answer: data.answer ? data.answer.substring(0, 100) + '...' : '',
+        detected_city: data.detected_city,
+        timestamp: new Date().toISOString(),
+    };
+
+    if (token) {
+        try {
+            const res = await fetch(`${API_BASE}/api/history`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) {
+                localStorage.removeItem(HISTORY_KEY);
+                return;
+            }
+        } catch (e) {
+            console.warn('记录历史失败，回退到本地存储', e);
+        }
+    }
+
+    const history = await getHistory();
     history.unshift({
         question: question,
         answer: data.answer ? data.answer.substring(0, 100) + '...' : '',
@@ -788,21 +990,17 @@ function saveToHistory(question, data) {
         timestamp: new Date().toISOString(),
         fullData: data,
     });
-    // 限制数量
-    if (history.length > MAX_HISTORY) {
-        history.length = MAX_HISTORY;
-    }
+    if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
     try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     } catch (e) {
-        // localStorage 满，清除旧记录
         history.length = 10;
         localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
     }
 }
 
-function renderHistory() {
-    const history = getHistory();
+async function renderHistory() {
+    const history = await getHistory();
     if (history.length === 0) {
         els.historyList.innerHTML = '<div class="h-empty">暂无问答记录</div>';
         return;
@@ -818,7 +1016,6 @@ function renderHistory() {
     els.historyList.querySelectorAll('.history-item').forEach(el => {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx);
-            const history = getHistory();
             const item = history[idx];
             if (item && item.fullData) {
                 els.questionInput.value = item.question;
@@ -833,8 +1030,8 @@ function renderHistory() {
     });
 }
 
-function loadHistory() {
-    renderHistory();
+async function loadHistory() {
+    await renderHistory();
 }
 
 // ========== 历史抽屉开关 ==========

@@ -5,12 +5,21 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from auth_store import (
+    append_user_history,
+    authenticate_user,
+    clear_user_history,
+    create_token,
+    list_user_history,
+    register_user,
+    verify_token,
+)
 from city_detector import extract_city_from_text, COVERED_CITIES
 from contribution_store import (
     append_entry_to_knowledge,
@@ -60,6 +69,7 @@ class Source(BaseModel):
     id: str
     title: str
     source: str
+    source_url: str | None = None
     city: str
     score: float | None = None
 
@@ -96,6 +106,31 @@ class ContributionResponse(BaseModel):
     reason: str | None = None
 
 
+class AuthUser(BaseModel):
+    id: str
+    username: str
+    created_at: str
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., description="用户名", min_length=3, max_length=30)
+    password: str = Field(..., description="密码", min_length=6, max_length=128)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: AuthUser
+
+
+class HistoryEntry(BaseModel):
+    id: str
+    question: str
+    answer: str | None = None
+    detected_city: str | None = None
+    timestamp: str
+    created_at: str
+
+
 # ============================================================
 # 启动事件
 # ============================================================
@@ -113,8 +148,97 @@ async def startup():
 
 
 # ============================================================
+# 权限认证
+# ============================================================
+
+
+def _get_bearer_token(authorization: str | None) -> str:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="请先登录")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=401, detail="登录令牌格式错误，请重新登录")
+    return token
+
+
+async def get_current_user(
+    authorization: str | None = Header(default=None),
+) -> dict:
+    try:
+        return verify_token(_get_bearer_token(authorization))
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+# ============================================================
 # API 路由
 # ============================================================
+
+
+@app.post("/api/register", response_model=AuthResponse)
+async def register(req: LoginRequest):
+    """注册新用户并返回令牌"""
+    try:
+        user = register_user(req.username, req.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    token = create_token(user)
+    return AuthResponse(
+        token=token,
+        user=AuthUser(
+            id=user["id"], username=user["username"], created_at=user["created_at"]
+        ),
+    )
+
+
+@app.post("/api/login", response_model=AuthResponse)
+async def login(req: LoginRequest):
+    """用户登录并返回令牌"""
+    user = authenticate_user(req.username, req.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    token = create_token(user)
+    return AuthResponse(
+        token=token,
+        user=AuthUser(
+            id=user["id"], username=user["username"], created_at=user["created_at"]
+        ),
+    )
+
+
+@app.get("/api/me", response_model=AuthUser)
+async def me(current_user: dict = Depends(get_current_user)):
+    """返回当前登录用户信息"""
+    return AuthUser(**current_user)
+
+
+@app.get("/api/history", response_model=list[HistoryEntry])
+async def get_history(current_user: dict = Depends(get_current_user)):
+    """获取当前用户的历史记录"""
+    return list_user_history(current_user["id"])
+
+
+@app.post("/api/history", response_model=HistoryEntry)
+async def add_history_entry(
+    entry: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """追加当前用户的历史记录"""
+    record = append_user_history(
+        user_id=current_user["id"],
+        question=entry.get("question", "").strip(),
+        answer=entry.get("answer"),
+        detected_city=entry.get("detected_city"),
+        timestamp=entry.get("timestamp"),
+    )
+    return HistoryEntry(**record)
+
+
+@app.delete("/api/history")
+async def clear_history(current_user: dict = Depends(get_current_user)):
+    """清空当前用户的历史记录"""
+    clear_user_history(current_user["id"])
+    return {"status": "ok", "user_id": current_user["id"]}
 
 
 @app.get("/api/health")
@@ -168,6 +292,7 @@ async def contribute_knowledge(
     source_type: str = Form("text", max_length=40),
     notes: str = Form("", max_length=2000),
     file: UploadFile | None = File(default=None),
+    current_user: dict = Depends(get_current_user),
 ):
     """用户上传亲身经历/文案/附件，审核后纳入知识库"""
     text_from_file = ""
@@ -284,6 +409,7 @@ async def ask_question(req: AskRequest):
                     id=r.get("id", ""),
                     title=r.get("title", ""),
                     source=r.get("source", ""),
+                    source_url=r.get("source_url") or r.get("sourceUrl") or "",
                     city=r.get("city", ""),
                     score=r.get("score"),
                 )
@@ -313,6 +439,7 @@ async def ask_question(req: AskRequest):
             id=r.get("id", ""),
             title=r.get("title", ""),
             source=r.get("source", ""),
+            source_url=r.get("source_url") or r.get("sourceUrl") or "",
             city=r.get("city", ""),
             score=r.get("score"),
         )
