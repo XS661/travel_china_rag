@@ -5,13 +5,21 @@
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from city_detector import extract_city_from_text, COVERED_CITIES
+from contribution_store import (
+    append_entry_to_knowledge,
+    get_submission,
+    list_submissions,
+    review_contribution,
+    save_submission,
+    update_submission_status,
+)
 from retriever import search_knowledge, get_city_info, get_knowledge_page
 from generator import call_llm, fallback_format, DEEPSEEK_MODEL
 
@@ -40,8 +48,12 @@ class AskRequest(BaseModel):
     question: str = Field(..., description="用户问题", min_length=1, max_length=500)
     city: str | None = Field(default=None, description="用户选择的城市")
     top_k: int = Field(default=5, description="检索返回数量", ge=1, le=10)
-    method: str = Field(default="bm25", description="检索方法：keyword / bm25 / vector / hybrid")
-    raw: bool = Field(default=False, description="true 时只返回检索结果（含分数），不调用 LLM")
+    method: str = Field(
+        default="bm25", description="检索方法：keyword / bm25 / vector / hybrid"
+    )
+    raw: bool = Field(
+        default=False, description="true 时只返回检索结果（含分数），不调用 LLM"
+    )
 
 
 class Source(BaseModel):
@@ -74,6 +86,14 @@ class KnowledgePage(BaseModel):
     page_size: int
     total_pages: int
     entries: list[dict]
+
+
+class ContributionResponse(BaseModel):
+    status: str
+    submission_id: str | None = None
+    review_note: str | None = None
+    entry: dict | None = None
+    reason: str | None = None
 
 
 # ============================================================
@@ -131,6 +151,91 @@ async def browse_knowledge(
         city=city, category=category, page=page, page_size=page_size
     )
     return KnowledgePage(**result)
+
+
+@app.get("/api/contributions")
+async def contributions(status: str | None = None):
+    """获取用户知识贡献记录（数据库）"""
+    return list_submissions(status=status)
+
+
+@app.post("/api/contribute", response_model=ContributionResponse)
+async def contribute_knowledge(
+    city: str = Form(..., min_length=1, max_length=50),
+    title: str = Form("", max_length=120),
+    content: str = Form("", max_length=5000),
+    source: str = Form("用户亲身经历", max_length=120),
+    source_type: str = Form("text", max_length=40),
+    notes: str = Form("", max_length=2000),
+    file: UploadFile | None = File(default=None),
+):
+    """用户上传亲身经历/文案/附件，审核后纳入知识库"""
+    text_from_file = ""
+    file_name = None
+    if file is not None:
+        file_name = file.filename or "upload"
+        raw = await file.read()
+        if raw:
+            candidate = raw.decode("utf-8", errors="ignore")
+            if candidate.strip():
+                text_from_file = candidate.strip()
+
+    merged_content = (content or "").strip() or text_from_file
+    if not merged_content.strip():
+        raise HTTPException(status_code=400, detail="请填写文案或上传文本文件")
+
+    submission = save_submission(
+        city=city,
+        title=title or (f"{city}旅游体验"),
+        content=merged_content,
+        category="",
+        sub_category="",
+        source=source,
+        source_type=source_type,
+        file_name=file_name,
+        notes=notes,
+    )
+
+    review_result = review_contribution(
+        city=city,
+        title=title or f"{city}旅游体验",
+        content=merged_content,
+        category="",
+        sub_category="",
+        source=source,
+        filename=file_name,
+    )
+
+    if review_result["status"] == "approved":
+        entry = review_result["entry"]
+        append_entry_to_knowledge(entry)
+        update_submission_status(
+            submission["id"],
+            status="approved",
+            review_note=review_result.get("review_note", "AI 审核通过"),
+            approved_entry=entry,
+        )
+        return ContributionResponse(
+            status="approved",
+            submission_id=submission["id"],
+            review_note=review_result.get("review_note", "AI 审核通过"),
+            entry=entry,
+            reason=review_result.get("reason", "审核通过"),
+        )
+
+    update_submission_status(
+        submission["id"],
+        status="rejected",
+        review_note=review_result.get("reason", "审核未通过"),
+        approved_entry=None,
+    )
+    return ContributionResponse(
+        status="rejected",
+        submission_id=submission["id"],
+        review_note=review_result.get("reason", "审核未通过"),
+        entry=None,
+        reason=review_result.get("reason", "审核未通过"),
+    )
 
 
 @app.post("/api/ask", response_model=AskResponse)

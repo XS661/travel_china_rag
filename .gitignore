@@ -33,3 +33,7 @@ Desktop.ini
 
 # Logs
 *.log
+
+# Generated runtime data
+backend/data/
+backend/uploads/

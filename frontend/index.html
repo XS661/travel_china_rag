@@ -1,5 +1,6 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -8,9 +9,12 @@
     <title>走遍中国 · 智能旅游助手</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;900&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
     <!-- 背景装饰 -->
     <div class="bg" aria-hidden="true">
@@ -25,10 +29,11 @@
         <header class="topbar">
             <div class="brand">
                 <div class="brand-mark">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#241505" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 19.5h18"/>
-                        <path d="M5.2 19.5 10 11.5l3.2 4.1 2.1-2.9 3.5 6.8"/>
-                        <circle cx="16.8" cy="6.2" r="2.3" fill="#241505" stroke="none"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#241505" stroke-width="2.1" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 19.5h18" />
+                        <path d="M5.2 19.5 10 11.5l3.2 4.1 2.1-2.9 3.5 6.8" />
+                        <circle cx="16.8" cy="6.2" r="2.3" fill="#241505" stroke="none" />
                     </svg>
                 </div>
                 <div class="brand-text">
@@ -42,14 +47,19 @@
                     <span id="status-label">连接中</span>
                 </div>
                 <button type="button" class="icon-btn" id="history-btn" aria-label="问答历史" title="最近问答">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
                     </svg>
                 </button>
                 <button type="button" class="icon-btn" id="clear-btn" aria-label="清空对话" title="清空对话">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
                     </svg>
                 </button>
             </div>
@@ -95,23 +105,40 @@
             <!-- 输入行 -->
             <div class="input-row">
                 <div class="input-wrap">
-                    <input
-                        type="text"
-                        id="question-input"
-                        placeholder="问点什么，比如：成都三天怎么玩？"
-                        autocomplete="off"
-                        maxlength="500"
-                    >
+                    <input type="text" id="question-input" placeholder="问点什么，比如：成都三天怎么玩？" autocomplete="off"
+                        maxlength="500">
                 </div>
                 <button type="button" class="send-btn" id="ask-btn" aria-label="发送">
                     <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3.4 20.4l17.4-7.5c.8-.34.8-1.5 0-1.84L3.4 3.6c-.66-.3-1.4.27-1.4 1v4.9c0 .5.36.93.85 1L14 12 2.85 14.5c-.49.07-.85.5-.85 1v4.9c0 .73.74 1.3 1.4 1z"/>
+                        <path
+                            d="M3.4 20.4l17.4-7.5c.8-.34.8-1.5 0-1.84L3.4 3.6c-.66-.3-1.4.27-1.4 1v4.9c0 .5.36.93.85 1L14 12 2.85 14.5c-.49.07-.85.5-.85 1v4.9c0 .73.74 1.3 1.4 1z" />
                     </svg>
                 </button>
             </div>
 
             <!-- 快捷提问标签 -->
             <div class="chip-scroll" id="quick-tags"><!-- 快捷标签由 JS 动态生成 --></div>
+
+            <!-- 知识贡献入口 -->
+            <div class="contribute-box">
+                <button type="button" class="contribute-toggle" id="contribute-toggle">+ 上传旅游经验</button>
+                <div class="contribute-panel" id="contribute-panel" hidden>
+                    <div class="contribute-grid">
+                        <input type="text" id="contribute-city" placeholder="城市，如：成都" />
+                        <input type="text" id="contribute-title" placeholder="标题，如：成都火锅路线" />
+                    </div>
+                    <textarea id="contribute-content" rows="4"
+                        placeholder="请填写您的亲身经历或文案，说明景点、美食、交通、攻略等信息..."></textarea>
+                    <div class="contribute-actions">
+                        <label class="upload-label" for="contribute-file">
+                            <input type="file" id="contribute-file" accept=".txt,.md,.json,.csv,.doc,.docx,.pdf" />
+                            <span>上传文件</span>
+                        </label>
+                        <button type="button" class="primary-btn" id="submit-contribution">提交审核</button>
+                    </div>
+                    <div class="contribute-status" id="contribute-status"></div>
+                </div>
+            </div>
         </footer>
 
         <!-- ========== 历史抽屉 ========== -->
@@ -131,4 +158,5 @@
 
     <script src="/static/app.js"></script>
 </body>
+
 </html>

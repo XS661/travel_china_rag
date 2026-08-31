@@ -1,0 +1,46 @@
+[
+  {
+    "id": "_meta",
+    "domain": "全国旅游",
+    "city": "成都",
+    "category": "_meta",
+    "sub_category": "",
+    "title": "",
+    "content": "",
+    "keywords": [
+      "成都"
+    ],
+    "source": "系统自动生成",
+    "source_url": "",
+    "chunk_id": 0,
+    "city_tag": "旅游体验",
+    "aliases": [
+      "成都"
+    ]
+  },
+  {
+    "id": "user_成都_20260831064422_2ae934",
+    "domain": "全国旅游",
+    "city": "成都",
+    "category": "旅游体验",
+    "sub_category": "城市观光",
+    "title": "成都宽窄巷子附近火锅与春熙路逛街体验",
+    "content": "用户和朋友在成都宽窄巷子附近品尝火锅，晚上前往春熙路逛街。",
+    "keywords": [
+      "成都",
+      "宽窄",
+      "巷子",
+      "附近",
+      "火锅",
+      "春熙路",
+      "逛街",
+      "体验",
+      "用户",
+      "朋友"
+    ],
+    "source": "用户亲身经历",
+    "source_url": "",
+    "chunk_id": 1,
+    "city_tag": "旅游体验"
+  }
+]

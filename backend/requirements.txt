@@ -6,3 +6,4 @@ openai==1.50.0
 python-dotenv==1.0.1
 pydantic==2.9.0
 sentence-transformers==6.0.0
+python-multipart==0.0.9
