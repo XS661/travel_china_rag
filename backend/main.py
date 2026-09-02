@@ -3,6 +3,7 @@
 提供 /api/ask、/api/health、/api/cities、/api/knowledge 接口
 """
 
+import re
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
@@ -23,7 +24,9 @@ from auth_store import (
 from city_detector import extract_city_from_text, COVERED_CITIES
 from contribution_store import (
     append_entry_to_knowledge,
+    get_public_submission,
     get_submission,
+    list_community_posts,
     list_submissions,
     review_contribution,
     save_submission,
@@ -72,6 +75,8 @@ class Source(BaseModel):
     source_url: str | None = None
     city: str
     score: float | None = None
+    user_id: str | None = None
+    username: str | None = None
 
 
 class AskResponse(BaseModel):
@@ -171,8 +176,72 @@ async def get_current_user(
 
 
 # ============================================================
-# API 路由
+# 答案来源过滤
 # ============================================================
+
+
+def _tokenize_for_relevance(text: str) -> set[str]:
+    """将文本拆成关键词集合，便于比较 answer 与来源的相关性。"""
+    if not text:
+        return set()
+    cleaned = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]+", " ", text.lower())
+    return {token for token in cleaned.split() if len(token) >= 1}
+
+
+def _filter_relevant_sources(search_results: list[dict], answer: str) -> list[dict]:
+    """保留与当前回答直接相关的来源。优先遵循答案中的 [来源N] 引用。"""
+    if not search_results:
+        return []
+
+    cited_indices = []
+    for match in re.finditer(r"\[来源\s*(\d+)\]", answer or ""):
+        try:
+            idx = int(match.group(1)) - 1
+        except ValueError:
+            continue
+        if 0 <= idx < len(search_results):
+            cited_indices.append(idx)
+
+    if cited_indices:
+        deduped = []
+        seen = set()
+        for idx in cited_indices:
+            if idx not in seen:
+                deduped.append(search_results[idx])
+                seen.add(idx)
+        return deduped
+
+    answer_tokens = _tokenize_for_relevance(answer or "")
+    if not answer_tokens:
+        return search_results[: min(3, len(search_results))]
+
+    ranked = []
+    for idx, result in enumerate(search_results):
+        candidate_text = " ".join(
+            filter(
+                None,
+                [
+                    result.get("title", ""),
+                    result.get("content", ""),
+                    result.get("city", ""),
+                    result.get("source", ""),
+                    result.get("category", ""),
+                    result.get("sub_category", ""),
+                ],
+            )
+        )
+        result_tokens = _tokenize_for_relevance(candidate_text)
+        overlap = len(answer_tokens & result_tokens)
+        title_tokens = _tokenize_for_relevance(str(result.get("title", "")))
+        title_overlap = len(answer_tokens & title_tokens)
+        score = overlap * 2 + title_overlap
+        ranked.append((score, idx, result))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    selected = [item[2] for item in ranked if item[0] > 0]
+    if selected:
+        return selected[: min(3, len(selected))]
+    return search_results[: min(3, len(search_results))]
 
 
 @app.post("/api/register", response_model=AuthResponse)
@@ -283,6 +352,21 @@ async def contributions(status: str | None = None):
     return list_submissions(status=status)
 
 
+@app.get("/api/community")
+async def community_posts(username: str | None = None):
+    """公共社区：按作者或全部展示已审核的帖子"""
+    return list_community_posts(username=username)
+
+
+@app.get("/api/community/{submission_id}")
+async def community_post_detail(submission_id: str):
+    """公开社区帖子详情"""
+    item = get_public_submission(submission_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="帖子不存在或尚未审核通过")
+    return item
+
+
 @app.get("/api/my-contributions")
 async def my_contributions(current_user: dict = Depends(get_current_user)):
     """获取当前用户自己的帖子列表"""
@@ -369,6 +453,9 @@ async def contribute_knowledge(
 
     if review_result["status"] == "approved":
         entry = review_result["entry"]
+        entry["user_id"] = current_user["id"]
+        entry["username"] = current_user["username"]
+        entry["submission_id"] = submission["id"]
         append_entry_to_knowledge(entry)
         update_submission_status(
             submission["id"],
@@ -442,12 +529,14 @@ async def ask_question(req: AskRequest):
             answer="",
             sources=[
                 Source(
-                    id=r.get("id", ""),
+                    id=r.get("submission_id") or r.get("id", ""),
                     title=r.get("title", ""),
                     source=r.get("source", ""),
                     source_url=r.get("source_url") or r.get("sourceUrl") or "",
                     city=r.get("city", ""),
                     score=r.get("score"),
+                    user_id=r.get("user_id"),
+                    username=r.get("username"),
                 )
                 for r in search_results
             ],
@@ -469,17 +558,20 @@ async def ask_question(req: AskRequest):
         answer = fallback_format(search_results)
         model_used = "fallback"
 
-    # 7. 构造来源列表
+    # 7. 只保留与当前回答直接相关的来源
+    relevant_results = _filter_relevant_sources(search_results, answer)
     sources = [
         Source(
-            id=r.get("id", ""),
+            id=r.get("submission_id") or r.get("id", ""),
             title=r.get("title", ""),
             source=r.get("source", ""),
             source_url=r.get("source_url") or r.get("sourceUrl") or "",
             city=r.get("city", ""),
             score=r.get("score"),
+            user_id=r.get("user_id"),
+            username=r.get("username"),
         )
-        for r in search_results
+        for r in relevant_results
     ]
 
     return AskResponse(

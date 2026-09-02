@@ -45,6 +45,11 @@ const els = {
     userHomeList: $('user-home-list'),
     userHomeTitle: $('user-home-title'),
     userHomeClose: $('user-home-close'),
+    communityBtn: $('community-btn'),
+    communityPanel: $('community-panel'),
+    communityList: $('community-list'),
+    communityTitle: $('community-title'),
+    communityClose: $('community-close'),
     authModal: $('auth-modal'),
     authBackdrop: $('auth-backdrop'),
     authClose: $('auth-close'),
@@ -267,6 +272,10 @@ function bindEvents() {
         await openUserHome();
     });
     els.userHomeClose.addEventListener('click', closeUserHome);
+    els.communityBtn.addEventListener('click', async () => {
+        await openCommunityHome();
+    });
+    els.communityClose.addEventListener('click', closeCommunityHome);
 
     els.authBackdrop.addEventListener('click', closeAuthModal);
     els.authClose.addEventListener('click', closeAuthModal);
@@ -547,7 +556,14 @@ function pushAiMessage(data) {
             const title = escapeHtml(src.title || '');
             const sourceLabel = escapeHtml(src.source || '来源');
             const url = (src.source_url || src.sourceUrl || '').trim();
-            const sourceText = url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="src-link" title="${sourceLabel}">${title}</a>` : `<span class="src-title">${title}</span>`;
+            const sourceId = (src.submission_id || src.id || '').trim();
+            const username = (src.username || '').trim();
+            const isCommunitySource = (src.source === '用户亲身经历' || !!src.username || !!src.user_id || !!sourceId);
+            const sourceText = isCommunitySource
+                ? `<button type="button" class="src-link source-link" data-source-id="${escapeHtml(sourceId)}" data-username="${escapeHtml(username)}" title="${sourceLabel}">${title}</button>`
+                : url
+                    ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="src-link" title="${sourceLabel}">${title}</a>`
+                    : `<span class="src-title">${title}</span>`;
             const tag = src.source ? `<span class="src-source-tag" title="${sourceLabel}">${sourceLabel}</span>` : '';
             sources += `<span class="src-chip"><i>${idx + 1}</i>${sourceText}${tag}</span>`;
         });
@@ -571,6 +587,21 @@ function pushAiMessage(data) {
                 ${sources}
             </div>`;
     wrap.querySelector('.bubble-body').innerHTML = renderMarkdown(data.answer || '');
+    const sourceLinks = wrap.querySelectorAll('.source-link');
+    sourceLinks.forEach((button) => {
+        button.addEventListener('click', async () => {
+            const sourceId = (button.dataset.sourceId || '').trim();
+            const username = (button.dataset.username || '').trim();
+            const sourceTitle = button.textContent.trim();
+            const sourceCity = button.closest('.src-chip')?.parentElement?.dataset?.city || '';
+            els.communityPanel.hidden = false;
+            if (!sourceId && username) {
+                await loadCommunityPosts(username);
+                return;
+            }
+            await openCommunityPostDetail(sourceId, username, sourceTitle, sourceCity);
+        });
+    });
     els.conversation.appendChild(wrap);
     scrollToBottom();
 }
@@ -903,6 +934,149 @@ async function openUserHome() {
 
 function closeUserHome() {
     els.userHomePanel.hidden = true;
+}
+
+function closeCommunityHome() {
+    els.communityPanel.hidden = true;
+}
+
+async function openCommunityHome() {
+    els.communityPanel.hidden = false;
+    await loadCommunityPosts();
+}
+
+async function loadCommunityPosts(username = '') {
+    try {
+        const url = username
+            ? `${API_BASE}/api/community?username=${encodeURIComponent(username)}`
+            : `${API_BASE}/api/community`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('获取社区帖子失败');
+        const posts = await res.json();
+        if (!posts.length) {
+            els.communityList.innerHTML = '<div class="home-empty">社区里还没有帖子，快来发布第一篇吧。</div>';
+            return;
+        }
+
+        const title = username ? `${username} 的社区主页` : '用户动态';
+        els.communityTitle.textContent = title;
+        els.communityList.innerHTML = posts.map((post) => `
+            <article class="user-post-card community-post-card" data-post-id="${escapeHtml(post.id || '')}">
+                <div class="post-topline">
+                    <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
+                    <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
+                </div>
+                <div class="community-author-line">
+                    <span>作者：${escapeHtml(post.username || '用户')}</span>
+                </div>
+                <h4>${escapeHtml(post.title || '旅游心得')}</h4>
+                <p>${escapeHtml((post.content || '').slice(0, 180))}${(post.content || '').length > 180 ? '…' : ''}</p>
+                <div class="post-meta">
+                    <span>${escapeHtml(post.source || '用户亲身经历')}</span>
+                    <span>${escapeHtml(post.username || '用户')}</span>
+                </div>
+            </article>
+        `).join('');
+
+        els.communityList.querySelectorAll('.community-post-card').forEach((card) => {
+            card.addEventListener('click', async () => {
+                const postId = card.dataset.postId;
+                if (!postId) return;
+                await openCommunityPostDetail(postId);
+            });
+        });
+    } catch (err) {
+        console.warn(err);
+        els.communityList.innerHTML = '<div class="home-empty">社区帖子加载失败，请稍后重试。</div>';
+    }
+}
+
+async function findCommunityPostBySource(sourceTitle, sourceCity = '') {
+    const title = (sourceTitle || '').trim();
+    const city = (sourceCity || '').trim();
+    if (!title) return null;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/community`);
+        if (!res.ok) return null;
+        const posts = await res.json();
+        const idByExactMatch = posts.find((post) => {
+            const sameTitle = (post.title || '').trim() === title;
+            const sameCity = !city || (post.city || '').trim() === city;
+            return sameTitle && sameCity;
+        });
+        if (idByExactMatch) return idByExactMatch.id || null;
+
+        const idByTitle = posts.find((post) => (post.title || '').trim() === title);
+        return idByTitle ? (idByTitle.id || null) : null;
+    } catch (err) {
+        console.warn('查找社区对应帖子失败', err);
+        return null;
+    }
+}
+
+async function openCommunityPostDetail(postId, username = '', sourceTitle = '', sourceCity = '') {
+    const authorName = (username || '').trim();
+    let resolvedId = (postId || '').trim();
+
+    if (!resolvedId) {
+        resolvedId = await findCommunityPostBySource(sourceTitle, sourceCity);
+    }
+
+    if (!resolvedId) {
+        if (authorName) {
+            await loadCommunityPosts(authorName);
+        } else {
+            els.communityPanel.hidden = false;
+            els.communityTitle.textContent = '用户动态';
+            await loadCommunityPosts();
+        }
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/api/community/${resolvedId}`);
+        if (!res.ok) {
+            const fallbackId = await findCommunityPostBySource(sourceTitle, sourceCity);
+            if (fallbackId) {
+                await openCommunityPostDetail(fallbackId, authorName, sourceTitle, sourceCity);
+                return;
+            }
+            if (authorName) {
+                await loadCommunityPosts(authorName);
+                return;
+            }
+            throw new Error('社区帖子获取失败');
+        }
+        const post = await res.json();
+        const displayAuthor = post.username || authorName || '用户';
+        els.communityTitle.textContent = `${displayAuthor} 的社区主页`;
+        els.communityList.innerHTML = `
+            <div class="user-post-detail community-post-detail">
+                <button type="button" class="back-link" data-action="back-to-community">← 返回社区</button>
+                <div class="post-detail-header">
+                    <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
+                    <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
+                </div>
+                <div class="community-author-line">
+                    <span>作者：${escapeHtml(displayAuthor)}</span>
+                </div>
+                <h4>${escapeHtml(post.title || '旅游心得')}</h4>
+                <div class="post-detail-source">${escapeHtml(post.source || '用户亲身经历')}</div>
+                <div class="post-detail-body">${escapeHtml(post.content || '').replace(/\n/g, '<br>')}</div>
+            </div>
+        `;
+
+        const backBtn = els.communityList.querySelector('[data-action="back-to-community"]');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => loadCommunityPosts(displayAuthor));
+        }
+    } catch (err) {
+        console.warn(err);
+        els.communityPanel.hidden = false;
+        els.communityTitle.textContent = '用户动态';
+        await loadCommunityPosts();
+    }
 }
 
 async function loadUserHomePosts() {

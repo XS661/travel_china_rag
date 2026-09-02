@@ -38,6 +38,22 @@ class ContributionStoreTests(unittest.TestCase):
         self.assertEqual(item.source_url, "https://example.com/source/1")
         self.assertIn("用户亲身经历", item.source)
 
+    def test_filter_relevant_sources_for_answer(self):
+        from main import _filter_relevant_sources
+
+        results = [
+            {"title": "蒙德城景点推荐", "score": 0.92},
+            {"title": "冒菜美食攻略", "score": 0.85},
+            {"title": "巴渝文化介绍", "score": 0.75},
+        ]
+
+        filtered = _filter_relevant_sources(
+            results,
+            "蒙德城适合散步和拍照，推荐风神丘陵和蒙德城遗址。[来源1]",
+        )
+
+        self.assertEqual([item["title"] for item in filtered], ["蒙德城景点推荐"])
+
 
 class AuthFlowTests(unittest.TestCase):
     def setUp(self):
@@ -185,6 +201,38 @@ class AuthFlowTests(unittest.TestCase):
             headers={"Authorization": f"Bearer {token}"},
         )
         self.assertEqual(check.status_code, 404, check.text)
+
+    def test_public_community_post_listing_and_lookup(self):
+        username = f"community_{uuid.uuid4().hex[:6]}"
+        reg = self.client.post(
+            "/api/register",
+            json={"username": username, "password": "Secret123!"},
+        )
+        token = reg.json()["token"]
+
+        created = self.client.post(
+            "/api/contribute",
+            data={
+                "city": "新艾利都",
+                "title": "随机店铺打卡",
+                "content": "我在六分街附近的录像店里发现了很有氛围的店铺，适合散步和拍照。",
+                "source": "用户亲身经历",
+                "source_type": "text",
+                "notes": "社区测试",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        post_id = created.json()["submission_id"]
+
+        feed = self.client.get("/api/community")
+        self.assertEqual(feed.status_code, 200, feed.text)
+        self.assertTrue(any(item["id"] == post_id for item in feed.json()))
+
+        detail = self.client.get(f"/api/community/{post_id}")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["username"], username)
+        self.assertEqual(detail.json()["city"], "新艾利都")
 
 
 if __name__ == "__main__":

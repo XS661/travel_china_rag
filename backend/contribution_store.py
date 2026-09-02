@@ -344,6 +344,9 @@ def prepare_knowledge_entry(payload: dict) -> dict:
     sub_category = (payload.get("sub_category") or "").strip()
     source = (payload.get("source") or "用户亲身经历").strip() or "用户亲身经历"
     source_url = (payload.get("source_url") or "").strip()
+    submission_id = (payload.get("submission_id") or payload.get("id") or "").strip()
+    user_id = (payload.get("user_id") or "").strip()
+    username = (payload.get("username") or "").strip()
 
     keywords = _extract_keywords(f"{title} {content} {category} {sub_category}")
     entry = {
@@ -357,10 +360,56 @@ def prepare_knowledge_entry(payload: dict) -> dict:
         "keywords": keywords,
         "source": source,
         "source_url": source_url,
+        "submission_id": submission_id,
+        "user_id": user_id,
+        "username": username,
         "chunk_id": 1,
         "city_tag": category,
     }
     return entry
+
+
+def list_community_posts(username: str | None = None) -> list[dict]:
+    _ensure_storage()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    if username:
+        rows = conn.execute(
+            "SELECT * FROM contributions WHERE status = 'approved' AND username = ? ORDER BY created_at DESC",
+            (username,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM contributions WHERE status = 'approved' ORDER BY created_at DESC"
+        ).fetchall()
+    conn.close()
+
+    out = []
+    for row in rows:
+        item = dict(row)
+        item["approved_entry"] = (
+            json.loads(item["approved_entry"]) if item["approved_entry"] else None
+        )
+        out.append(item)
+    return out
+
+
+def get_public_submission(submission_id: str) -> dict | None:
+    _ensure_storage()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM contributions WHERE id = ? AND status = 'approved'",
+        (submission_id,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    item = dict(row)
+    item["approved_entry"] = (
+        json.loads(item["approved_entry"]) if item["approved_entry"] else None
+    )
+    return item
 
 
 def append_entry_to_knowledge(entry: dict) -> dict:
@@ -401,7 +450,14 @@ def append_entry_to_knowledge(entry: dict) -> dict:
             },
         )
 
-    normalized = prepare_knowledge_entry(entry)
+    normalized = prepare_knowledge_entry(
+        {
+            **entry,
+            "submission_id": entry.get("submission_id") or entry.get("id") or "",
+            "user_id": entry.get("user_id") or "",
+            "username": entry.get("username") or "",
+        }
+    )
     if not any(existing.get("id") == normalized["id"] for existing in data):
         data.append(normalized)
 
