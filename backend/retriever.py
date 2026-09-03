@@ -46,6 +46,7 @@ def _init_jieba():
         return
     # 将城市名和别名加入 jieba 词典，确保能被正确分词
     from city_detector import get_all_city_names
+
     for name in get_all_city_names():
         jieba.add_word(name)
     _jieba_initialized = True
@@ -130,7 +131,9 @@ def _init_bm25(entries: list[dict]) -> tuple[list[list[str]], BM25Okapi]:
     return _bm25_corpus, _bm25_index
 
 
-def _init_inverted_index(entries: list[dict], cache_key: str = "__all__") -> dict[str, set[int]]:
+def _init_inverted_index(
+    entries: list[dict], cache_key: str = "__all__"
+) -> dict[str, set[int]]:
     """构建倒排索引（按候选集缓存，不同城市互不污染）"""
     global _inverted_index_cache
     if cache_key in _inverted_index_cache:
@@ -153,6 +156,7 @@ def _init_inverted_index(entries: list[dict], cache_key: str = "__all__") -> dic
 # ============================================================
 # 方案 A：关键词匹配检索（jieba 分词 + 倒排索引）
 # ============================================================
+
 
 def search_keyword(
     question: str,
@@ -192,8 +196,39 @@ def search_keyword(
     # 对问题分词
     question_tokens = list(jieba.cut(question))
     # 过滤停用词（简单处理）
-    stop_words = {"的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有", "看", "好", "自己", "这"}
-    question_keywords = [t for t in question_tokens if t.strip() and t not in stop_words]
+    stop_words = {
+        "的",
+        "了",
+        "在",
+        "是",
+        "我",
+        "有",
+        "和",
+        "就",
+        "不",
+        "人",
+        "都",
+        "一",
+        "一个",
+        "上",
+        "也",
+        "很",
+        "到",
+        "说",
+        "要",
+        "去",
+        "你",
+        "会",
+        "着",
+        "没有",
+        "看",
+        "好",
+        "自己",
+        "这",
+    }
+    question_keywords = [
+        t for t in question_tokens if t.strip() and t not in stop_words
+    ]
 
     if not question_keywords:
         return candidates[:top_k]
@@ -212,7 +247,9 @@ def search_keyword(
     results = []
     for idx, score in scored_indices[:top_k]:
         entry = dict(candidates[idx])
-        entry["score"] = round(score / len(question_keywords), 4) if question_keywords else 0
+        entry["score"] = (
+            round(score / len(question_keywords), 4) if question_keywords else 0
+        )
         results.append(entry)
 
     return results
@@ -221,6 +258,7 @@ def search_keyword(
 # ============================================================
 # 方案 B：BM25 检索（rank-bm25）
 # ============================================================
+
 
 def search_bm25(
     question: str,
@@ -286,6 +324,7 @@ def search_bm25(
 # 方案 C：文本向量相似度检索（sentence-transformers）
 # ============================================================
 
+
 def get_vector_status() -> str:
     """返回向量检索可用状态：not_loaded / ready / unavailable"""
     return _vector_status
@@ -305,8 +344,15 @@ def _init_vector_index(entries: list[dict]) -> np.ndarray | None:
     try:
         if _vector_model is None:
             print(f"[INFO] 加载向量模型: {_VECTOR_MODEL_NAME} ...")
-            # local_files_only：模型已缓存时绝不联网校验，避免网络不通导致长时间挂起
-            _vector_model = SentenceTransformer(_VECTOR_MODEL_NAME, local_files_only=True)
+            # 先尝试从本地缓存加载（已下载过则秒级加载）
+            try:
+                _vector_model = SentenceTransformer(
+                    _VECTOR_MODEL_NAME, local_files_only=True
+                )
+            except Exception:
+                # 缓存未命中，尝试自动下载（国内网络建议设置 HF_ENDPOINT=https://hf-mirror.com）
+                print("[INFO] 本地缓存未命中，尝试自动下载模型...")
+                _vector_model = SentenceTransformer(_VECTOR_MODEL_NAME)
         texts = [_build_search_text(entry) for entry in entries]
         vectors = _vector_model.encode(
             texts,
@@ -316,14 +362,16 @@ def _init_vector_index(entries: list[dict]) -> np.ndarray | None:
         )
         _vector_corpus = np.asarray(vectors, dtype=np.float32)
         _vector_status = "ready"
-        print(f"[INFO] 向量索引构建完成：共 {len(entries)} 条，维度 {_vector_corpus.shape[1]}")
+        print(
+            f"[INFO] 向量索引构建完成：共 {len(entries)} 条，维度 {_vector_corpus.shape[1]}"
+        )
     except Exception as e:
         _vector_status = "unavailable"
         print(f"[WARNING] 向量模型加载失败：{e}")
         print(
             "[HINT] 首次使用需先下载模型（国内网络可先设置 "
             "HF_ENDPOINT=https://hf-mirror.com 或配置代理）："
-            f"python -c \"from sentence_transformers import SentenceTransformer; "
+            f'python -c "from sentence_transformers import SentenceTransformer; '
             f"SentenceTransformer('{_VECTOR_MODEL_NAME}')\""
         )
         return None
@@ -411,6 +459,7 @@ def search_vector(
 # 方案 D：BM25 + 文本向量混合检索（加权融合）
 # ============================================================
 
+
 def search_hybrid(
     question: str,
     city: str | None = None,
@@ -484,6 +533,7 @@ def search_hybrid(
 # 统一检索接口
 # ============================================================
 
+
 def search_knowledge(
     question: str,
     city: str | None = None,
@@ -540,13 +590,15 @@ def compare_methods(
             status = "error"
             print(f"[WARNING] 检索方式 {method} 执行失败：{e}")
         latency_ms = int((time.perf_counter() - start) * 1000)
-        results.append({
-            "method": method,
-            "label": label,
-            "status": status,
-            "latency_ms": latency_ms,
-            "results": entries,
-        })
+        results.append(
+            {
+                "method": method,
+                "label": label,
+                "status": status,
+                "latency_ms": latency_ms,
+                "results": entries,
+            }
+        )
     return results
 
 
@@ -558,12 +610,14 @@ def get_city_info() -> list[dict]:
     for city in COVERED_CITIES:
         entries = city_map.get(city, [])
         categories = list(set(e.get("category", "") for e in entries))
-        info_list.append({
-            "city": city,
-            "tags": CITY_TAGS.get(city, ""),
-            "entry_count": len(entries),
-            "categories": categories,
-        })
+        info_list.append(
+            {
+                "city": city,
+                "tags": CITY_TAGS.get(city, ""),
+                "entry_count": len(entries),
+                "categories": categories,
+            }
+        )
     return info_list
 
 
