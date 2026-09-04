@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -43,8 +43,6 @@
             </div>
             <div class="topbar-actions">
                 <button type="button" class="user-pill" id="auth-btn" aria-label="登录/注册">登录</button>
-                <button type="button" class="user-home-btn" id="user-home-btn" aria-label="我的主页">我的主页</button>
-                <button type="button" class="community-btn" id="community-btn" aria-label="社区主页">社区</button>
                 <button type="button" class="icon-btn" id="history-btn" aria-label="问答历史" title="最近问答">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
@@ -64,105 +62,189 @@
             </div>
         </header>
 
-        <!-- ========== 聊天滚动区 ========== -->
-        <main class="chat-scroll" id="chat-scroll">
-            <!-- 欢迎页 -->
-            <section class="welcome" id="welcome">
-                <div class="welcome-mark">🏔️</div>
-                <h2 class="welcome-title">下一站，去哪？</h2>
-                <p class="welcome-sub">覆盖 8 个热门旅游城市<br>景点 · 美食 · 交通 · 行程 一站式问答</p>
-                <div class="welcome-chips" id="welcome-chips"><!-- 由 JS 动态生成 --></div>
+        <!-- ========== 页面视图容器 ========== -->
+        <div class="views">
+
+            <!-- ===== 主页（问答） ===== -->
+            <section class="view active" id="view-home" data-view="home" aria-label="主页">
+                <main class="chat-scroll" id="chat-scroll">
+                    <!-- 欢迎页 -->
+                    <section class="welcome" id="welcome">
+                        <div class="welcome-mark">🏔️</div>
+                        <h2 class="welcome-title">下一站，去哪？</h2>
+                        <p class="welcome-sub">覆盖 8 个热门旅游城市<br>景点 · 美食 · 交通 · 行程 一站式问答</p>
+                        <div class="welcome-chips" id="welcome-chips"><!-- 由 JS 动态生成 --></div>
+                    </section>
+
+                    <!-- 对话流 -->
+                    <div id="conversation" class="conversation"></div>
+
+                    <!-- 打字指示器 -->
+                    <div class="typing" id="typing" hidden>
+                        <div class="typing-dots"><span></span><span></span><span></span></div>
+                        <span class="typing-text" id="typing-text">正在检索知识库…</span>
+                    </div>
+
+                    <!-- 检索方式对比矩阵 -->
+                    <div class="compare-card" id="compare-card" hidden></div>
+                </main>
+
+                <!-- 底部操作区 -->
+                <footer class="composer">
+                    <!-- 城市快捷筛选 -->
+                    <div class="chip-scroll" id="city-chips"><!-- 城市 chips 由 JS 动态生成 --></div>
+
+                    <!-- 检索方式 -->
+                    <div class="method-toggle" id="method-toggle" role="group" aria-label="选择检索方式">
+                        <button type="button" class="method-option active" data-method="bm25">BM25</button>
+                        <button type="button" class="method-option" data-method="keyword">关键词</button>
+                        <button type="button" class="method-option" data-method="vector">向量</button>
+                        <button type="button" class="method-option" data-method="hybrid">混合</button>
+                    </div>
+                    <div class="compare-banner" id="compare-banner" hidden>⚖️ 对比模式 · 四种检索方式横向对比</div>
+
+                    <!-- 输入行 -->
+                    <div class="input-row">
+                        <div class="input-wrap">
+                            <input type="text" id="question-input" placeholder="问点什么，比如：成都三天怎么玩？" autocomplete="off"
+                                maxlength="500">
+                        </div>
+                        <button type="button" class="send-btn" id="ask-btn" aria-label="发送">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M3.4 20.4l17.4-7.5c.8-.34.8-1.5 0-1.84L3.4 3.6c-.66-.3-1.4.27-1.4 1v4.9c0 .5.36.93.85 1L14 12 2.85 14.5c-.49.07-.85.5-.85 1v4.9c0 .73.74 1.3 1.4 1z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- 快捷提问标签 -->
+                    <div class="chip-scroll" id="quick-tags"><!-- 快捷标签由 JS 动态生成 --></div>
+                </footer>
             </section>
 
-            <!-- 对话流 -->
-            <div id="conversation" class="conversation"></div>
-
-            <!-- 打字指示器 -->
-            <div class="typing" id="typing" hidden>
-                <div class="typing-dots"><span></span><span></span><span></span></div>
-                <span class="typing-text" id="typing-text">正在检索知识库…</span>
-            </div>
-
-            <!-- 检索方式对比矩阵 -->
-            <div class="compare-card" id="compare-card" hidden></div>
-        </main>
-
-        <!-- ========== 底部操作区 ========== -->
-        <footer class="composer">
-            <!-- 城市快捷筛选 -->
-            <div class="chip-scroll" id="city-chips"><!-- 城市 chips 由 JS 动态生成 --></div>
-
-            <!-- 检索方式 -->
-            <div class="method-toggle" id="method-toggle" role="group" aria-label="选择检索方式">
-                <button type="button" class="method-option active" data-method="bm25">BM25</button>
-                <button type="button" class="method-option" data-method="keyword">关键词</button>
-                <button type="button" class="method-option" data-method="vector">向量</button>
-                <button type="button" class="method-option" data-method="hybrid">混合</button>
-            </div>
-            <div class="compare-banner" id="compare-banner" hidden>⚖️ 对比模式 · 四种检索方式横向对比</div>
-
-            <!-- 输入行 -->
-            <div class="input-row">
-                <div class="input-wrap">
-                    <input type="text" id="question-input" placeholder="问点什么，比如：成都三天怎么玩？" autocomplete="off"
-                        maxlength="500">
-                </div>
-                <button type="button" class="send-btn" id="ask-btn" aria-label="发送">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M3.4 20.4l17.4-7.5c.8-.34.8-1.5 0-1.84L3.4 3.6c-.66-.3-1.4.27-1.4 1v4.9c0 .5.36.93.85 1L14 12 2.85 14.5c-.49.07-.85.5-.85 1v4.9c0 .73.74 1.3 1.4 1z" />
-                    </svg>
-                </button>
-            </div>
-
-            <!-- 快捷提问标签 -->
-            <div class="chip-scroll" id="quick-tags"><!-- 快捷标签由 JS 动态生成 --></div>
-
-            <!-- 知识贡献入口 -->
-            <div class="contribute-box">
-                <button type="button" class="contribute-toggle" id="contribute-toggle">+ 上传旅游经验</button>
-                <div class="contribute-panel" id="contribute-panel" hidden>
-                    <div class="contribute-grid">
-                        <input type="text" id="contribute-city" placeholder="城市，如：成都" />
-                        <input type="text" id="contribute-title" placeholder="标题，如：成都火锅路线" />
+            <!-- ===== 社区 ===== -->
+            <section class="view" id="view-community" data-view="community" aria-label="社区">
+                <div class="view-head">
+                    <div>
+                        <div class="view-eyebrow">COMMUNITY</div>
+                        <h2 id="community-title">用户动态</h2>
                     </div>
-                    <textarea id="contribute-content" rows="4"
-                        placeholder="请填写您的亲身经历或文案，说明景点、美食、交通、攻略等信息..."></textarea>
-                    <div class="contribute-actions">
-                        <label class="upload-label" for="contribute-file">
-                            <input type="file" id="contribute-file" accept=".txt,.md,.json,.csv,.doc,.docx,.pdf" />
-                            <span>上传文件</span>
-                        </label>
-                        <button type="button" class="primary-btn" id="submit-contribution">提交审核</button>
+                    <button type="button" class="icon-btn small view-refresh" id="community-refresh" aria-label="刷新社区"
+                        title="刷新社区">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                            <path d="M21 3v6h-6" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="view-scroll" id="community-scroll">
+                    <div class="post-list" id="community-list"></div>
+                </div>
+            </section>
+
+            <!-- ===== 上传经验 ===== -->
+            <section class="view" id="view-upload" data-view="upload" aria-label="上传旅游经验">
+                <div class="view-head">
+                    <div>
+                        <div class="view-eyebrow">CONTRIBUTE</div>
+                        <h2>上传旅游经验</h2>
                     </div>
-                    <div class="contribute-status" id="contribute-status"></div>
                 </div>
-            </div>
-        </footer>
+                <div class="view-scroll">
+                    <!-- 未登录提示 -->
+                    <div class="upload-gate card-panel" id="upload-gate" hidden>
+                        <div class="gate-icon">🔐</div>
+                        <h4>登录后即可分享</h4>
+                        <p>上传您的亲身旅游经历，审核通过后会纳入知识库，帮助更多旅行者。</p>
+                        <button type="button" class="primary-btn" id="upload-login-btn">立即登录 / 注册</button>
+                    </div>
 
-        <!-- ========== 用户主页 ========== -->
-        <section class="user-home-panel" id="user-home-panel" hidden>
-            <div class="user-home-header">
-                <div>
-                    <div class="user-home-label">我的主页</div>
-                    <h3 id="user-home-title">我的投稿</h3>
+                    <!-- 上传表单 -->
+                    <form class="upload-form card-panel" id="upload-form" novalidate>
+                        <div class="contribute-tip">✨ 支持文字与文件（.txt .md .json .csv .doc .docx .pdf）</div>
+                        <div class="contribute-grid">
+                            <input type="text" id="contribute-city" placeholder="城市，如：成都" autocomplete="off" />
+                            <input type="text" id="contribute-title" placeholder="标题，如：成都火锅路线" autocomplete="off" />
+                        </div>
+                        <textarea id="contribute-content" rows="6"
+                            placeholder="请填写您的亲身经历或文案，说明景点、美食、交通、攻略等信息..."></textarea>
+                        <div class="contribute-actions">
+                            <label class="upload-label" for="contribute-file">
+                                <input type="file" id="contribute-file" accept=".txt,.md,.json,.csv,.doc,.docx,.pdf" />
+                                <span id="upload-file-name">上传文件</span>
+                            </label>
+                            <button type="submit" class="primary-btn" id="submit-contribution">提交审核</button>
+                        </div>
+                        <div class="contribute-status" id="contribute-status"></div>
+                    </form>
                 </div>
-                <button type="button" class="icon-btn small" id="user-home-close" aria-label="关闭个人主页">×</button>
-            </div>
-            <div class="user-home-list" id="user-home-list"></div>
-        </section>
+            </section>
 
-        <!-- ========== 社区主页 ========== -->
-        <section class="user-home-panel community-panel" id="community-panel" hidden>
-            <div class="user-home-header">
-                <div>
-                    <div class="user-home-label">社区</div>
-                    <h3 id="community-title">用户动态</h3>
+            <!-- ===== 我的 ===== -->
+            <section class="view" id="view-me" data-view="me" aria-label="我的">
+                <div class="view-head">
+                    <div>
+                        <div class="view-eyebrow">PROFILE</div>
+                        <h2>我的</h2>
+                    </div>
                 </div>
-                <button type="button" class="icon-btn small" id="community-close" aria-label="关闭社区主页">×</button>
-            </div>
-            <div class="user-home-list" id="community-list"></div>
-        </section>
+                <div class="view-scroll">
+                    <!-- 用户卡片 -->
+                    <div class="me-user-card card-panel" id="me-user-card"></div>
+
+                    <!-- 分区切换 -->
+                    <div class="me-tabs" role="tablist" aria-label="我的功能分区">
+                        <button type="button" class="me-tab active" data-section="history" role="tab">历史记录</button>
+                        <button type="button" class="me-tab" data-section="follows" role="tab">关注列表</button>
+                        <button type="button" class="me-tab" data-section="posts" role="tab">我的投稿</button>
+                    </div>
+
+                    <!-- 分区内容 -->
+                    <div class="me-content" id="me-content"></div>
+
+                    <button type="button" class="me-logout" id="me-logout" hidden>退出登录</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ========== 底部导航栏 ========== -->
+        <nav class="tabbar" id="tabbar" aria-label="主导航">
+            <button type="button" class="tab-item active" data-view="home" aria-label="主页" title="主页">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M3 10.5 12 3l9 7.5" />
+                    <path d="M5.5 9.5V21h13V9.5" />
+                </svg>
+                <span>主页</span>
+            </button>
+            <button type="button" class="tab-item" data-view="community" aria-label="社区" title="社区">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18" />
+                    <path d="M12 3c2.6 2.5 4 5.6 4 9s-1.4 6.5-4 9c-2.6-2.5-4-5.6-4-9s1.4-6.5 4-9z" />
+                </svg>
+                <span>社区</span>
+            </button>
+            <button type="button" class="tab-item" data-view="upload" aria-label="上传经验" title="上传经验">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M12 16V4" />
+                    <path d="m7 9 5-5 5 5" />
+                    <path d="M4 20h16" />
+                </svg>
+                <span>上传经验</span>
+            </button>
+            <button type="button" class="tab-item" data-view="me" aria-label="我的" title="我的">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4.5 21c0-4 3.4-6.5 7.5-6.5s7.5 2.5 7.5 6.5" />
+                </svg>
+                <span>我的</span>
+            </button>
+        </nav>
 
         <!-- ========== 历史抽屉 ========== -->
         <div class="sheet-backdrop" id="sheet-backdrop"></div>
