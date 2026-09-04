@@ -1,0 +1,153 @@
+[
+  {
+    "id": "_meta",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "_meta",
+    "sub_category": "",
+    "title": "",
+    "content": "",
+    "keywords": [],
+    "source": "",
+    "source_url": "",
+    "chunk_id": 0,
+    "city_tag": "海滨、啤酒、红瓦绿树",
+    "aliases": [
+      "岛城",
+      "琴岛",
+      "东方瑞士"
+    ]
+  },
+  {
+    "id": "travel_qd_001",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "景点",
+    "sub_category": "海滨风光",
+    "title": "栈桥——青岛的城市象征",
+    "content": "栈桥位于青岛市南区中山路南端，全长440米，是青岛最著名的标志性景点。南端回澜阁是一座具有民族风格的八角亭。\"飞阁回澜\"是青岛十景之一。景区免费开放。地铁1号线中山路站步行约10分钟可达。",
+    "keywords": [
+      "栈桥",
+      "回澜阁",
+      "飞阁回澜",
+      "青岛地标",
+      "海滨"
+    ],
+    "source": "青岛市文化和旅游局",
+    "source_url": "https://whlyj.qingdao.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_qd_002",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "景点",
+    "sub_category": "欧式建筑",
+    "title": "八大关——万国建筑博览群",
+    "content": "八大关汇聚了20多个国家的建筑风格，被誉为\"万国建筑博览会\"。著名建筑包括花石楼、公主楼等。景区免费开放。地铁3号线太平角公园站下车步行可达。",
+    "keywords": [
+      "八大关",
+      "万国建筑",
+      "花石楼",
+      "公主楼",
+      "第二海水浴场"
+    ],
+    "source": "青岛市文化和旅游局",
+    "source_url": "https://whlyj.qingdao.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_qd_003",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "景点",
+    "sub_category": "名山",
+    "title": "崂山——海上第一名山",
+    "content": "崂山是中国海岸线第一高峰，主峰海拔1132.7米，被称为\"海上第一名山\"。崂山以道教名山著称，太清宫是现存最大的道观。建议安排一整天游览，从市区乘坐地铁11号线到崂山风景区站。",
+    "keywords": [
+      "崂山",
+      "海上第一名山",
+      "道教",
+      "太清宫",
+      "仰口"
+    ],
+    "source": "崂山风景区官网",
+    "source_url": "https://www.laoshan.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_qd_004",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "景点",
+    "sub_category": "美食",
+    "title": "青岛海鲜与啤酒",
+    "content": "青岛海鲜讲究\"鲜活\"，推荐虾虎、梭子蟹、鲅鱼、蛤蜊。吃海鲜推荐营口路市场自己买找店家加工，人均80-150元。青岛啤酒享誉世界，原浆啤酒和散啤是必尝，每年8月有青岛国际啤酒节。",
+    "keywords": [
+      "青岛海鲜",
+      "青岛啤酒",
+      "原浆",
+      "啤酒节",
+      "营口路"
+    ],
+    "source": "青岛市餐饮行业协会",
+    "source_url": "https://www.qdcanyin.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_qd_005",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "交通",
+    "sub_category": "航空",
+    "title": "青岛胶东国际机场指南",
+    "content": "青岛胶东国际机场（TAO），4F级国际机场。到市区：①地铁8号线到青岛北站约40分钟，票价7元；②机场大巴20-30元；③出租车到市南区约100-150元。",
+    "keywords": [
+      "胶东机场",
+      "TAO",
+      "地铁8号线",
+      "机场大巴"
+    ],
+    "source": "青岛胶东国际机场官网",
+    "source_url": "https://www.qdairport.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_qd_006",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "行程",
+    "sub_category": "三日游",
+    "title": "青岛三日经典游路线",
+    "content": "第一天：栈桥→天主教堂→信号山→第一海水浴场日落。第二天：崂山一日游。第三天：八大关→小麦岛→情人坝。",
+    "keywords": [
+      "三日游",
+      "老城区",
+      "崂山",
+      "八大关",
+      "小麦岛"
+    ],
+    "source": "青岛市文化和旅游局",
+    "source_url": "https://whlyj.qingdao.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_qd_007",
+    "domain": "全国旅游",
+    "city": "青岛",
+    "category": "贴士",
+    "sub_category": "最佳季节",
+    "title": "青岛最佳旅游季节",
+    "content": "最佳季节是夏季（6-8月）避暑，秋季（9-11月）海鲜最肥美。冬季（12-2月）栈桥有大量海鸥越冬。海边紫外线强，注意防晒。",
+    "keywords": [
+      "最佳季节",
+      "夏季避暑",
+      "秋季海鲜",
+      "冬季海鸥",
+      "防晒"
+    ],
+    "source": "青岛市气象局",
+    "source_url": "https://qdqx.qingdao.gov.cn",
+    "chunk_id": 1
+  }
+]

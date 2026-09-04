@@ -662,5 +662,120 @@
     "source": "苏州市文化广电和旅游局",
     "source_url": "https://www.visitsz.com",
     "chunk_id": 1
+  },
+  {
+    "id": "suzhou_extension_play",
+    "domain": "全国旅游",
+    "city": "苏州",
+    "category": "游玩",
+    "sub_category": "按天数定制行程",
+    "title": "苏州1日、2日、3日和5日游方案",
+    "content": "苏州1日游：拙政园、苏州博物馆、平江路；2日游：第1天园林与平江路，第2天虎丘、山塘街和留园；3日游：增加同里或周庄古镇；5日游：增加金鸡湖、甪直古镇和园林深度游。拙政园、苏州博物馆和热门古镇需提前预约，园林适合步行慢游，古镇应预留半天以上。",
+    "keywords": [
+      "苏州景点",
+      "苏州1日游",
+      "苏州2日游",
+      "苏州3日游",
+      "苏州5日游",
+      "拙政园",
+      "平江路",
+      "虎丘",
+      "周庄"
+    ],
+    "source": "苏州旅游公开信息整理",
+    "source_url": "https://wgl.suzhou.gov.cn",
+    "chunk_id": 1,
+    "city_tag": "江南园林"
+  },
+  {
+    "id": "suzhou_extension_stay",
+    "domain": "全国旅游",
+    "city": "苏州",
+    "category": "住宿",
+    "sub_category": "区域选择",
+    "title": "苏州住宿建议",
+    "content": "姑苏区平江路、观前街适合古城步行和夜游；山塘街靠近虎丘及运河景观；苏州站附近适合铁路换乘；园区金鸡湖适合现代商圈；周庄、同里可住一晚体验古镇，但旺季需提前确认停车和接驳。",
+    "keywords": [
+      "苏州住宿",
+      "姑苏区",
+      "平江路",
+      "观前街",
+      "山塘街",
+      "苏州站",
+      "金鸡湖",
+      "周庄"
+    ],
+    "source": "苏州住宿建议整理",
+    "source_url": "https://wgl.suzhou.gov.cn",
+    "chunk_id": 2,
+    "city_tag": "江南园林"
+  },
+  {
+    "id": "suzhou_extension_transport",
+    "domain": "全国旅游",
+    "city": "苏州",
+    "category": "交通",
+    "sub_category": "古城与古镇",
+    "title": "苏州交通指南",
+    "content": "苏州站和苏州北站承担高铁，苏南硕放机场是常用航空节点。古城景点适合地铁、公交和步行组合，园林周边停车位有限；前往周庄、同里可乘旅游专线或正规接驳，节假日古镇周边拥堵应提前出发。",
+    "keywords": [
+      "苏州交通",
+      "苏州站",
+      "苏州北站",
+      "硕放机场",
+      "地铁",
+      "周庄",
+      "同里",
+      "旅游专线"
+    ],
+    "source": "苏州交通公开信息整理",
+    "source_url": "https://jtj.suzhou.gov.cn",
+    "chunk_id": 3,
+    "city_tag": "江南园林"
+  },
+  {
+    "id": "suzhou_extension_food",
+    "domain": "全国旅游",
+    "city": "苏州",
+    "category": "美食",
+    "sub_category": "苏帮菜与小吃",
+    "title": "苏州特色美食",
+    "content": "推荐苏式汤面、松鼠鳜鱼、响油鳝糊、碧螺虾仁、生煎、糖粥、桂花鸡头米和阳澄湖大闸蟹。观前街、平江路、山塘街选择丰富，蟹类和时令菜应确认规格、价格及加工方式。",
+    "keywords": [
+      "苏州美食",
+      "苏式汤面",
+      "松鼠鳜鱼",
+      "响油鳝糊",
+      "碧螺虾仁",
+      "糖粥",
+      "大闸蟹"
+    ],
+    "source": "苏州饮食文化整理",
+    "source_url": "https://wgl.suzhou.gov.cn",
+    "chunk_id": 4,
+    "city_tag": "江南园林"
+  },
+  {
+    "id": "suzhou_extension_weather",
+    "domain": "全国旅游",
+    "city": "苏州",
+    "category": "天气",
+    "sub_category": "分季节出行参考",
+    "title": "苏州四季天气与穿衣",
+    "content": "以下是历史气候参考，不是实时预报。春季多雨，带雨具和防水鞋；夏季炎热湿润，梅雨和雷雨较多；秋季舒适，适合园林和古镇游；冬季湿冷，需保暖防风。古镇水乡雨天路滑，出发前查询实时预报和景区公告。",
+    "keywords": [
+      "苏州天气",
+      "苏州天气预报",
+      "梅雨",
+      "夏季雷雨",
+      "秋季",
+      "冬季湿冷",
+      "古镇雨天",
+      "穿衣"
+    ],
+    "source": "中国天气网气候资料整理",
+    "source_url": "https://www.weather.com.cn",
+    "chunk_id": 5,
+    "city_tag": "江南园林"
   }
 ]

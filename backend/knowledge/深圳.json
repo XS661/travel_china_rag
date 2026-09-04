@@ -1,0 +1,381 @@
+[
+  {
+    "id": "_meta",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "_meta",
+    "sub_category": "",
+    "title": "",
+    "content": "",
+    "keywords": [],
+    "source": "",
+    "source_url": "",
+    "chunk_id": 0,
+    "city_tag": "科技创新、主题公园、海滨城市",
+    "aliases": [
+      "鹏城",
+      "深港"
+    ]
+  },
+  {
+    "id": "travel_sz_001",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "主题公园",
+    "title": "世界之窗——不出国门看世界",
+    "content": "世界之窗位于南山区华侨城，汇集130多个世界著名微缩景观。门票：全日票220元，夜场票100元（18:00后入场）。地铁1号线或2号线世界之窗站直达。",
+    "keywords": [
+      "世界之窗",
+      "微缩景观",
+      "埃菲尔铁塔",
+      "主题公园",
+      "华侨城"
+    ],
+    "source": "世界之窗官网",
+    "source_url": "https://www.szwwco.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_002",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "商业中心",
+    "title": "深圳湾公园——城市与自然融合",
+    "content": "深圳湾公园全长约13公里，从红树林延伸到蛇口，可隔海远眺香港。免费开放，地铁9号线深圳湾公园站D2出口出站就是海景。红树林每年10月到次年4月有大量候鸟过冬。",
+    "keywords": [
+      "深圳湾公园",
+      "红树林",
+      "观鸟",
+      "骑行",
+      "日落"
+    ],
+    "source": "深圳市城市管理和综合执法局",
+    "source_url": "https://www.szcg.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_003",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "主题公园",
+    "title": "锦绣中华民俗村——一日游遍中国",
+    "content": "世界最大微缩景观公园，按1:15浓缩中国各地景点，包括长城、故宫等80多个景点。民俗文化村展示56个民族风情。联票200元。地铁1号线华侨城站D出口。",
+    "keywords": [
+      "锦绣中华",
+      "微缩景观",
+      "民俗村",
+      "民族风情",
+      "华侨城"
+    ],
+    "source": "锦绣中华民俗村官网",
+    "source_url": "https://www.szchinatown.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_004",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "主题公园",
+    "title": "东部华侨城——山海度假胜地",
+    "content": "东部华侨城位于盐田区大梅沙，分大侠谷（机动游戏，门票200元）和茶溪谷（自然风光，门票180元）。联票约300元。地铁8号线到盐田港西站换乘景区直通车。",
+    "keywords": [
+      "东部华侨城",
+      "大侠谷",
+      "茶溪谷",
+      "茵特拉根",
+      "大梅沙"
+    ],
+    "source": "深圳东部华侨城官网",
+    "source_url": "https://www.octeast.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_005",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "海滨",
+    "title": "大梅沙海滨公园——深圳最美海滩",
+    "content": "大梅沙是深圳最著名的海滨浴场，免费开放（旺季需预约，每天限流8万人）。地铁8号线大梅沙站C出口出站即是。7-9月最适合游泳。",
+    "keywords": [
+      "大梅沙",
+      "海滨浴场",
+      "沙滩",
+      "游泳",
+      "盐田"
+    ],
+    "source": "深圳市盐田区文旅局",
+    "source_url": "https://www.yantian.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_006",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "都市地标",
+    "title": "莲花山公园——邓小平铜像",
+    "content": "莲花山公园山顶矗立着邓小平铜像，可以俯瞰福田CBD全景。免费开放，登山约15-20分钟。地铁3号线或4号线少年宫站F1出口步行5分钟。",
+    "keywords": [
+      "莲花山",
+      "邓小平铜像",
+      "福田CBD",
+      "城市全景",
+      "风筝广场"
+    ],
+    "source": "深圳市城市管理和综合执法局",
+    "source_url": "https://www.szcg.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_007",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "景点",
+    "sub_category": "博物馆",
+    "title": "深圳博物馆——了解深圳前世今生",
+    "content": "深圳博物馆位于市民中心A区，展示深圳从渔村到现代化大都市的发展历程，改革开放史展厅最有看点。免费开放，周一闭馆，需提前预约。地铁2号线、4号线市民中心站B出口。",
+    "keywords": [
+      "深圳博物馆",
+      "改革开放",
+      "市民中心",
+      "历史",
+      "免费"
+    ],
+    "source": "深圳博物馆官网",
+    "source_url": "https://www.shenzhenmuseum.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_008",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "美食",
+    "sub_category": "粤菜",
+    "title": "深圳粤菜——广府美食",
+    "content": "深圳早茶推荐丹桂轩、胜记、唐宫等老字号。椰子鸡是深圳特色火锅，推荐润园四季，人均约80-120元。烧腊饭约20-35元。",
+    "keywords": [
+      "深圳粤菜",
+      "早茶",
+      "丹桂轩",
+      "椰子鸡",
+      "烧腊"
+    ],
+    "source": "深圳市餐饮协会",
+    "source_url": "https://www.szcanyin.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_009",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "美食",
+    "sub_category": "小吃夜市",
+    "title": "深圳夜市与美食街",
+    "content": "推荐美食街：①东门老街——人均30-50元吃撑；②盐田海鲜街——面朝大海吃海鲜；③蛇口海上世界——异国料理；④华强北——潮汕牛肉火锅；⑤水围夜市——烤鱼烧烤小龙虾。",
+    "keywords": [
+      "东门老街",
+      "盐田海鲜街",
+      "蛇口海上世界",
+      "水围夜市",
+      "美食街"
+    ],
+    "source": "深圳市餐饮协会",
+    "source_url": "https://www.szcanyin.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_010",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "交通",
+    "sub_category": "航空",
+    "title": "深圳宝安机场出行指南",
+    "content": "深圳宝安国际机场（SZX）。①地铁11号线到福田约30分钟，票价约10元；②机场大巴20-30元；③出租车到福田区约80-120元。",
+    "keywords": [
+      "宝安机场",
+      "SZX",
+      "T3航站楼",
+      "地铁11号线",
+      "机场快线"
+    ],
+    "source": "深圳宝安国际机场官网",
+    "source_url": "https://www.szairport.com",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_011",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "交通",
+    "sub_category": "市内交通",
+    "title": "深圳地铁与市内交通",
+    "content": "深圳地铁已开通16条线路，票价2元起，支持微信支付宝扫码乘车。出租车起步价10元/2公里。外地车工作日早晚高峰限行（7:00-9:00、17:30-19:30）。",
+    "keywords": [
+      "深圳地铁",
+      "深圳通",
+      "限行",
+      "公交",
+      "出租车"
+    ],
+    "source": "深圳市交通运输局",
+    "source_url": "https://www.sz.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_012",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "行程",
+    "sub_category": "三日游",
+    "title": "深圳三日经典游路线",
+    "content": "第一天：莲花山→深圳博物馆→世界之窗夜场。第二天：东部华侨城大侠谷→茶溪谷→盐田海鲜街。第三天：大梅沙→深圳湾公园→蛇口海上世界。",
+    "keywords": [
+      "三日游",
+      "莲花山",
+      "世界之窗",
+      "东部华侨城",
+      "大梅沙"
+    ],
+    "source": "深圳市文化广电旅游体育局",
+    "source_url": "https://www.sz.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "travel_sz_013",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "贴士",
+    "sub_category": "最佳季节",
+    "title": "深圳旅游最佳季节",
+    "content": "最佳季节是10月到次年4月，气温15-25℃。去香港可从罗湖、福田、皇岗、深圳湾口岸过关。主题公园门票提前在美团购票有折扣。外地车注意限行。",
+    "keywords": [
+      "最佳季节",
+      "注意事项",
+      "口岸通关",
+      "限行",
+      "消费"
+    ],
+    "source": "深圳市文化广电旅游体育局",
+    "source_url": "https://www.sz.gov.cn",
+    "chunk_id": 1
+  },
+  {
+    "id": "shenzhen_extension_play",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "游玩",
+    "sub_category": "按天数定制行程",
+    "title": "深圳1日、2日、3日和5日游方案",
+    "content": "深圳1日游：莲花山、市民中心、深圳博物馆和福田夜景；2日游：第1天城市地标，第2天世界之窗或欢乐谷；3日游：增加大梅沙、深圳湾公园和蛇口；5日游：增加东部华侨城、梧桐山或较场尾。主题公园、海滨和山地景区需根据预约、台风和空气质量调整，户外线路不宜排得过满。",
+    "keywords": [
+      "深圳景点",
+      "深圳1日游",
+      "深圳2日游",
+      "深圳3日游",
+      "深圳5日游",
+      "莲花山",
+      "世界之窗",
+      "大梅沙",
+      "深圳湾"
+    ],
+    "source": "深圳旅游公开信息整理",
+    "source_url": "https://www.sz.gov.cn",
+    "chunk_id": 1,
+    "city_tag": "滨海都市"
+  },
+  {
+    "id": "shenzhen_extension_stay",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "住宿",
+    "sub_category": "区域选择",
+    "title": "深圳住宿建议",
+    "content": "福田中心区适合市民中心、莲花山和商务出行；罗湖、东门适合购物与口岸换乘；南山、后海靠近科技园、深圳湾和海上世界；大梅沙、较场尾适合海边度假但离市区较远。预订关注地铁距离、停车及台风期间退订政策。",
+    "keywords": [
+      "深圳住宿",
+      "福田",
+      "罗湖",
+      "东门",
+      "南山",
+      "后海",
+      "大梅沙",
+      "较场尾"
+    ],
+    "source": "深圳住宿建议整理",
+    "source_url": "https://www.sz.gov.cn",
+    "chunk_id": 2,
+    "city_tag": "滨海都市"
+  },
+  {
+    "id": "shenzhen_extension_transport",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "交通",
+    "sub_category": "市内与口岸",
+    "title": "深圳交通指南",
+    "content": "宝安机场、深圳北站、福田站和深圳站承担主要交通。地铁覆盖市区景点，机场可乘地铁11号线；前往大梅沙、东部华侨城和较场尾应预留周末拥堵时间；前往香港需提前确认口岸开放、证件和通关要求。",
+    "keywords": [
+      "深圳交通",
+      "宝安机场",
+      "深圳北站",
+      "福田站",
+      "地铁11号线",
+      "大梅沙",
+      "口岸"
+    ],
+    "source": "深圳交通公开信息整理",
+    "source_url": "https://jtys.sz.gov.cn",
+    "chunk_id": 3,
+    "city_tag": "滨海都市"
+  },
+  {
+    "id": "shenzhen_extension_food",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "美食",
+    "sub_category": "岭南与移民风味",
+    "title": "深圳特色美食",
+    "content": "推荐椰子鸡、潮汕牛肉火锅、客家盐焗鸡、广式早茶、烧腊、海鲜和光明乳鸽。东门、华强北、车公庙、蛇口和盐田海鲜街选择丰富，海鲜按重量计价，点餐前确认加工费和价格。",
+    "keywords": [
+      "深圳美食",
+      "椰子鸡",
+      "潮汕牛肉火锅",
+      "盐焗鸡",
+      "早茶",
+      "光明乳鸽",
+      "盐田海鲜"
+    ],
+    "source": "深圳饮食文化整理",
+    "source_url": "https://www.sz.gov.cn",
+    "chunk_id": 4,
+    "city_tag": "滨海都市"
+  },
+  {
+    "id": "shenzhen_extension_weather",
+    "domain": "全国旅游",
+    "city": "深圳",
+    "category": "天气",
+    "sub_category": "分季节出行参考",
+    "title": "深圳四季天气与穿衣",
+    "content": "以下是历史气候参考，不是实时预报。春季温暖潮湿，回南天时注意防潮；夏季炎热多雨，台风和雷暴需关注预警；秋季通常晴朗舒适，是海滨游较好时段；冬季温和干燥，早晚备薄外套。海滩、海岛和山地活动以实时天气公告为准。",
+    "keywords": [
+      "深圳天气",
+      "深圳天气预报",
+      "回南天",
+      "夏季台风",
+      "雷暴",
+      "秋季",
+      "冬季",
+      "穿衣"
+    ],
+    "source": "中国天气网气候资料整理",
+    "source_url": "https://www.weather.com.cn",
+    "chunk_id": 5,
+    "city_tag": "滨海都市"
+  }
+]
