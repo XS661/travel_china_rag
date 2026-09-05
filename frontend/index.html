@@ -213,8 +213,23 @@
             </section>
         </div>
 
-        <!-- ========== 底部导航栏 ========== -->
+        <!-- ========== 底部导航栏（PC 端转为左侧边栏） ========== -->
         <nav class="tabbar" id="tabbar" aria-label="主导航">
+            <!-- PC 端侧边栏品牌区（移动端隐藏） -->
+            <div class="side-brand" aria-hidden="false">
+                <div class="side-brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#241505" stroke-width="2.1" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M3 19.5h18" />
+                        <path d="M5.2 19.5 10 11.5l3.2 4.1 2.1-2.9 3.5 6.8" />
+                        <circle cx="16.8" cy="6.2" r="2.3" fill="#241505" stroke="none" />
+                    </svg>
+                </div>
+                <div class="side-brand-text">
+                    <strong>走遍中国</strong>
+                    <span>智能旅游助手</span>
+                </div>
+            </div>
             <button type="button" class="tab-item active" data-view="home" aria-label="主页" title="主页">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
                     stroke-linejoin="round">
@@ -260,6 +275,20 @@
                 <button type="button" class="sheet-clear" id="history-clear">清空记录</button>
             </div>
             <div class="sheet-list" id="history-list"></div>
+        </section>
+
+        <!-- ========== 城市选择面板（chips 行右滑 / 点击「更多」展开） ========== -->
+        <section class="bottom-sheet city-sheet" id="city-sheet" aria-label="选择城市">
+            <div class="sheet-handle"></div>
+            <div class="sheet-head">
+                <h3>选择城市</h3>
+                <button type="button" class="sheet-clear" id="city-panel-close">完成</button>
+            </div>
+            <div class="city-search">
+                <input type="text" id="city-search-input" placeholder="🔍 搜索城市…" autocomplete="off"
+                    maxlength="30">
+            </div>
+            <div class="sheet-list city-grid" id="city-grid"></div>
         </section>
 
         <!-- ========== 登录弹窗 ========== -->
