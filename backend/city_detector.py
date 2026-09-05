@@ -7,9 +7,10 @@
 """
 
 import json
-from pathlib import Path
 
-KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
+from . import config
+
+KNOWLEDGE_DIR = config.KNOWLEDGE_DIR
 
 # === 以下变量在 _load_city_metadata() 中自动填充 ===
 COVERED_CITIES: list[str] = []  # 知识库覆盖的城市名列表

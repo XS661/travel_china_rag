@@ -7,11 +7,11 @@ import secrets
 import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parent
-DB_PATH = ROOT_DIR / "data" / "users.db"
-SECRET_KEY = "travel-qa-demo-secret-key-v1"
+from . import config
+
+DB_PATH = config.DATA_DIR / "users.db"
+SECRET_KEY = config.SECRET_KEY
 
 
 def _ensure_db() -> None:
@@ -145,7 +145,12 @@ def create_token(user: dict) -> str:
     payload = {
         "sub": user["id"],
         "username": user["username"],
-        "exp": int((datetime.now(timezone.utc) + timedelta(days=7)).timestamp()),
+        "exp": int(
+            (
+                datetime.now(timezone.utc)
+                + timedelta(days=config.TOKEN_TTL_DAYS)
+            ).timestamp()
+        ),
     }
     payload_json = json.dumps(
         payload, separators=(",", ":"), ensure_ascii=False

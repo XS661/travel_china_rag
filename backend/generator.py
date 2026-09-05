@@ -1,22 +1,13 @@
-"""
-答案生成模块
+"""答案生成模块
 - LLM 调用（DeepSeek API，兼容 OpenAI SDK）
 - 提示词构造
 - 降级方案（API 失败时直接返回检索片段原文）
+
+配置（API Key / 模型名等）统一来自 config.py，本模块不做任何 import 副作用。
 """
 
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-# 加载 .env 环境变量（使用文件所在目录的绝对路径，避免工作目录不同导致找不到）
-load_dotenv(Path(__file__).parent / ".env")
-
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
-
-from city_detector import COVERED_CITIES
+from . import config
+from .city_detector import COVERED_CITIES
 
 # ============================================================
 # 提示词模板
@@ -50,9 +41,22 @@ COMPARE_PROMPT = """你是一个专业的全国旅游规划助手。用户正在
 请分析："""
 
 
+def _format_references(search_results: list[dict]) -> str:
+    """把检索结果拼成带编号的参考资料文本"""
+    reference_parts = []
+    for i, result in enumerate(search_results, 1):
+        city = result.get("city", "未知")
+        title = result.get("title", "无标题")
+        content = result.get("content", "")
+        source = result.get("source", "未知来源")
+        reference_parts.append(
+            f"[来源{i}] 《{title}》({city}) - 来源：{source}\n{content}"
+        )
+    return "\n\n---\n\n".join(reference_parts)
+
+
 def build_prompt(question: str, search_results: list[dict]) -> str:
-    """
-    构造发给 LLM 的提示词
+    """构造发给 LLM 的提示词
 
     Args:
         question: 用户问题
@@ -64,23 +68,10 @@ def build_prompt(question: str, search_results: list[dict]) -> str:
     if not search_results:
         return _build_no_result_prompt(question)
 
-    # 构造参考资料文本
-    reference_parts = []
-    for i, result in enumerate(search_results, 1):
-        city = result.get("city", "未知")
-        title = result.get("title", "无标题")
-        content = result.get("content", "")
-        source = result.get("source", "未知来源")
-        reference_parts.append(
-            f"[来源{i}] 《{title}》({city}) - 来源：{source}\n{content}"
-        )
-
-    references = "\n\n---\n\n".join(reference_parts)
-
     prompt = f"""{SYSTEM_PROMPT}
 
 【参考资料】
-{references}
+{_format_references(search_results)}
 
 【用户问题】
 {question}
@@ -108,19 +99,9 @@ def build_compare_prompt(question: str, search_results: list[dict]) -> str:
     if not search_results:
         return _build_no_result_prompt(question)
 
-    reference_parts = []
-    for i, result in enumerate(search_results, 1):
-        city = result.get("city", "未知")
-        title = result.get("title", "无标题")
-        content = result.get("content", "")
-        source = result.get("source", "未知来源")
-        reference_parts.append(
-            f"[来源{i}] 《{title}》({city}) - 来源：{source}\n{content}"
-        )
-
-    references = "\n\n---\n\n".join(reference_parts)
-
-    return COMPARE_PROMPT.format(references=references, question=question)
+    return COMPARE_PROMPT.format(
+        references=_format_references(search_results), question=question
+    )
 
 
 # ============================================================
@@ -132,8 +113,7 @@ def call_llm(
     search_results: list[dict],
     timeout: int = 30,
 ) -> str:
-    """
-    调用 DeepSeek API 生成回答
+    """调用 DeepSeek API 生成回答
 
     Args:
         question: 用户问题
@@ -146,7 +126,7 @@ def call_llm(
     Raises:
         Various exceptions on API failure
     """
-    if not DEEPSEEK_API_KEY:
+    if not config.DEEPSEEK_API_KEY:
         raise ValueError(
             "DEEPSEEK_API_KEY 未配置，请在 backend/.env 文件中设置 API Key。\n"
             "可复制 .env.example 为 .env 并填入你的 Key。"
@@ -155,8 +135,8 @@ def call_llm(
     from openai import OpenAI
 
     client = OpenAI(
-        api_key=DEEPSEEK_API_KEY,
-        base_url=DEEPSEEK_BASE_URL,
+        api_key=config.DEEPSEEK_API_KEY,
+        base_url=config.DEEPSEEK_BASE_URL,
         timeout=timeout,
     )
 
@@ -168,7 +148,7 @@ def call_llm(
         prompt = build_prompt(question, search_results)
 
     response = client.chat.completions.create(
-        model=DEEPSEEK_MODEL,
+        model=config.DEEPSEEK_MODEL,
         messages=[
             {"role": "user", "content": prompt},
         ],
@@ -181,8 +161,7 @@ def call_llm(
 
 
 def fallback_format(search_results: list[dict]) -> str:
-    """
-    降级方案：API 不可用时直接格式化检索结果返回
+    """降级方案：API 不可用时直接格式化检索结果返回
 
     Args:
         search_results: 检索到的知识片段

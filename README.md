@@ -2,12 +2,12 @@
 
 > 面向全国的智能旅游问答与推荐系统（移动端 Web）
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg)](https://fastapi.tiangolo.com/)
 [![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-4B6BFB.svg)](https://platform.deepseek.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-基于 **RAG（检索增强生成）** 架构的智能旅游问答系统。覆盖全国 8 个热门旅游城市，提供景点介绍、美食推荐、交通指南、行程规划等一站式问答服务。用户只需用自然语言提问，系统从本地知识库中检索相关信息，调用大语言模型生成带来源标注的精准回答。
+基于 **RAG（检索增强生成）** 架构的智能旅游问答系统。覆盖全国 140+ 城市（当前 3259 条知识），提供景点介绍、美食推荐、交通指南、行程规划等一站式问答服务。用户只需用自然语言提问，系统从本地知识库中检索相关信息，调用大语言模型生成带来源标注的精准回答。
 
 ---
 
@@ -58,7 +58,7 @@
                       │
 ┌─────────────────────┴────────────────────────────┐
 │                   数据层                           │
-│   JSON 知识库（8 城市 × ~34 条 = 270+ 条目）      │
+│   JSON 知识库（按城市分文件，自动扫描，140+ 城市）           │
 │   .env 配置（API Key、模型名）                     │
 └──────────────────────────────────────────────────┘
 ```
@@ -97,34 +97,48 @@
 ## 📁 项目结构
 
 ```
-travel-qa-web/
+travel_china_rag/
 ├── README.md
-├── .gitignore
-├── backend/
-│   ├── main.py                 # FastAPI 入口，路由定义
-│   ├── retriever.py            # 检索模块（关键词 + BM25 + 向量 + 混合，向量索引增量持久化）
-│   ├── generator.py            # LLM 调用 + 提示词构造 + 降级方案
-│   ├── city_detector.py        # 城市名识别（从 JSON 自动加载）
-│   ├── knowledge/              # 知识库 JSON 文件（按城市分文件）
-│   │   ├── beijing.json        #   北京（33 条）
-│   │   ├── chengdu.json        #   成都（34 条）
-│   │   ├── hangzhou.json       #   杭州（33 条）
-│   │   ├── xian.json           #   西安（34 条）
-│   │   ├── chongqing.json      #   重庆（34 条）
-│   │   ├── guangzhou.json      #   广州（34 条）
-│   │   ├── suzhou.json         #   苏州（34 条）
-│   │   └── changsha.json       #   长沙（34 条）
-│   ├── data/                   # 运行时数据（.gitignore）：vector_index 向量快照、*.db、knowledge.lock
-│   ├── contribution_store.py   # 用户投稿入库（含 JSON 写锁 + 向量缓存增量失效）
-│   ├── test_incremental_vector.py  # 增量向量索引单测（FakeModel，无需真实模型）
-│   ├── requirements.txt        # Python 依赖
-│   ├── .env.example            # 环境变量模板
-│   └── .venv/                  # Python 虚拟环境
-└── frontend/
-    ├── index.html              # 页面结构（HTML）
-    ├── style.css               # 样式（深色极光玻璃拟态主题）
-    └── app.js                  # 交互逻辑（问答、城市筛选、历史记录等）
+├── pyproject.toml            # uv 项目配置（唯一依赖清单，Python 3.12+）
+├── uv.lock                   # 锁定的依赖版本
+├── backend/                  # FastAPI 后端（合法 Python 包）
+│   ├── __init__.py
+│   ├── main.py               # 入口：应用组装（lifespan + CORS + 路由挂载 + 静态托管）
+│   ├── config.py             # 环境变量与路径常量（唯一读取 .env 的地方）
+│   ├── schemas.py            # 请求/响应 Pydantic 模型
+│   ├── deps.py               # FastAPI 共享依赖（Bearer 鉴权）
+│   ├── routers/              # 路由层
+│   │   ├── ask.py            #   /api/ask 核心问答（含来源相关性过滤）
+│   │   ├── auth.py           #   注册 / 登录 / 当前用户 / 历史记录
+│   │   ├── knowledge.py      #   健康检查 / 城市列表 / 知识库浏览
+│   │   └── community.py      #   投稿审核入库 / 社区帖子 / 我的投稿
+│   ├── retriever.py          # 检索服务（KnowledgeBase 单例：关键词 + BM25 + 向量 + 混合）
+│   ├── generator.py          # LLM 调用 + 提示词构造 + 降级方案
+│   ├── city_detector.py      # 城市名识别（从 JSON 自动加载）
+│   ├── auth_store.py         # 用户 / 历史记录数据访问层（SQLite）
+│   ├── contribution_store.py # 投稿数据访问层 + 知识库写入（JSON 写锁 + 缓存刷新）
+│   ├── knowledge/            # 知识库 JSON 文件（按城市分文件，自动扫描）
+│   │   ├── beijing.json      #   ...覆盖 140+ 城市
+│   │   └── ...
+│   ├── data/                 # 运行时数据（.gitignore）：vector_index 向量快照、*.db、knowledge.lock
+│   ├── uploads/              # 用户投稿附件目录（.gitignore）
+│   ├── tests/                # 单元测试（unittest，从仓库根目录运行）
+│   │   ├── test_incremental_vector.py   # 增量向量索引测试（FakeModel，无需真实模型）
+│   │   └── test_contribution.py         # 投稿 / 认证 / 社区接口测试（TestClient）
+│   └── .env.example          # 环境变量模板
+├── frontend/
+│   ├── index.html            # 页面结构（HTML）
+│   ├── style.css             # 样式（深色极光玻璃拟态主题）
+│   ├── app.js                # 交互逻辑（问答、城市筛选、历史记录等）
+│   └── generated/            # 生成产物（勿手改，由 tools/ 重新生成）
+│       └── china-map.js      # 中国地图 SVG 路径数据
+└── tools/                    # 开发工具
+    ├── generate_china_map.py # 由 GeoJSON 生成 frontend/generated/china-map.js
+    └── data/
+        └── china_provinces.geojson   # 中国省级行政区划源数据
 ```
+
+> 依赖管理统一使用 **uv**（`pyproject.toml` + `uv.lock`），不再维护 `requirements.txt`。
 
 ---
 
@@ -132,50 +146,42 @@ travel-qa-web/
 
 ### 环境要求
 
-- Python 3.10+
-- pip
+- Python 3.12+（推荐用 [uv](https://docs.astral.sh/uv/) 管理）
 - 浏览器（Chrome / Edge）
 
 ### 首次安装
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/your-username/travel-qa-web.git
-cd travel-qa-web/backend
+# 1. 克隆项目并进入仓库根目录
+git clone https://github.com/XS661/travel_china_rag.git
+cd travel-china_rag
 
-# 2. 创建虚拟环境（仅首次）
-python -m venv .venv
+# 2. 创建虚拟环境并安装依赖（仅首次，依赖以 pyproject.toml + uv.lock 为准）
+uv sync
 
-# 3. 安装依赖（仅首次）
-# Windows:
-.venv/Scripts/pip install -r requirements.txt
-# macOS / Linux:
-# source .venv/bin/pip install -r requirements.txt
-
-# 4. 配置 API Key（仅首次）
+# 3. 配置 API Key（仅首次）
+cd backend
 cp .env.example .env
 # 编辑 .env，填入你的 DeepSeek API Key
 # 不配 Key 也能启动，系统会自动降级返回检索片段原文
+cd ..
 ```
 
 ### 每次启动
 
 ```bash
-cd backend
-
-# Windows:
-.venv/Scripts/python -m uvicorn main:app --host 0.0.0.0 --port 8000
-
-# macOS / Linux:
-# source .venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000
+# 在仓库根目录运行（任选其一）
+uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000
+# uv run python -m backend.main
+# python backend/main.py
 ```
 
 看到以下输出即为启动成功：
 
 ```
 INFO:     Uvicorn running on http://0.0.0.0:8000
-[INFO] 知识库加载完成：共 270 条记录
-[启动] 覆盖城市：北京, 长沙, 成都, 重庆, 广州, 杭州, 苏州, 西安
+[INFO] 知识库加载完成：共 3259 条记录
+[启动] 覆盖城市：三亚, 三明, 上海, ...
 ```
 
 浏览器访问 **http://localhost:8000** 即可使用。按 `Ctrl+C` 停止服务。
@@ -289,7 +295,7 @@ curl -X POST http://localhost:8000/api/ask \
 | 文化 | 地方历史、风俗、特色节庆               | ≥3        |
 | 贴士 | 天气、穿着、最佳季节、注意事项         | ≥3        |
 
-**当前统计**：8 城市 × ~34 条 = **270+ 条目**
+**当前统计**：140+ 城市 / 共 **3259 条知识条目**（启动时自动扫描统计）
 
 ---
 
@@ -336,6 +342,12 @@ curl -X POST http://localhost:8000/api/ask \
 ---
 
 ## 🧪 测试
+
+自动化单元测试覆盖：增量向量索引（快照加载 / 增量编码 / 版本重建）与 投稿、认证、社区接口流程，共 15 个用例。运行方式（仓库根目录）：
+
+```bash
+uv run python -m unittest discover -s backend/tests -v
+```
 
 内部测试问题集覆盖：事实查询、流程说明、对比分析、建议生成、预算估算、边界问题 6 种类型，共 12 个测试用例。
 

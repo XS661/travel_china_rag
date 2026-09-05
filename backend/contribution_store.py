@@ -3,19 +3,19 @@ import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 import jieba
+
+from . import config
 
 try:
     import fcntl  # POSIX 文件锁（Windows 不可用时降级为无锁）
 except ImportError:  # pragma: no cover
     fcntl = None
 
-ROOT_DIR = Path(__file__).resolve().parent
-KNOWLEDGE_DIR = ROOT_DIR / "knowledge"
-UPLOAD_DIR = ROOT_DIR / "uploads"
-DB_PATH = ROOT_DIR / "data" / "contributions.db"
+KNOWLEDGE_DIR = config.KNOWLEDGE_DIR
+UPLOAD_DIR = config.UPLOAD_DIR
+DB_PATH = config.DATA_DIR / "contributions.db"
 
 STOP_WORDS = {
     "的",
@@ -500,18 +500,13 @@ def append_entry_to_knowledge(entry: dict) -> dict:
         _release_knowledge_lock(lock_file)
 
     try:
-        import city_detector
-        import retriever
+        from . import city_detector
+        from . import retriever
 
         city_detector._metadata_loaded = False
         city_detector._load_city_metadata()
-        retriever._knowledge_cache = None
-        retriever._city_knowledge_cache = None
-        retriever._bm25_corpus = None
-        retriever._bm25_index = None
-        retriever._inverted_index_cache.clear()
-        # 只清内存向量语料；磁盘快照保留，下次检索仅增量编码新条目
-        retriever.invalidate_vector_cache()
+        # 统一刷新检索服务的全部内存缓存（磁盘向量快照保留）
+        retriever.knowledge_base.reload()
     except Exception:
         pass
 
@@ -572,13 +567,14 @@ def review_contribution(
 
     try:
         from openai import OpenAI
-        from generator import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 
-        if not DEEPSEEK_API_KEY:
+        if not config.DEEPSEEK_API_KEY:
             raise ValueError("No API key")
 
         client = OpenAI(
-            api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL, timeout=30
+            api_key=config.DEEPSEEK_API_KEY,
+            base_url=config.DEEPSEEK_BASE_URL,
+            timeout=30,
         )
         prompt = (
             "你是旅游知识审核助手。请根据用户上传的亲身经历或文案，整理成一条适合旅游知识库的事实型条目。"
@@ -588,7 +584,7 @@ def review_contribution(
             f"城市：{city}\n标题：{title}\n分类：{category}\n子分类：{sub_category}\n来源：{source}\n\n原文：\n{cleaned}"
         )
         response = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
+            model=config.DEEPSEEK_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=1200,
