@@ -110,8 +110,8 @@ def get_user_by_username(username: str) -> dict | None:
 def register_user(username: str, password: str) -> dict:
     _ensure_db()
     cleaned_name = _normalize_username(username)
-    if not re.fullmatch(r"[A-Za-z0-9_\u4e00-\u9fa5]{3,30}", cleaned_name):
-        raise ValueError("用户名只能包含中文、字母、数字和下划线，长度 3-30")
+    if not re.fullmatch(r"[A-Za-z0-9_\u4e00-\u9fa5]+", cleaned_name):
+        raise ValueError("用户名不能为空，且只能包含中文、字母、数字和下划线")
     if len(password or "") < 6:
         raise ValueError("密码长度至少为 6 位")
     if get_user_by_username(cleaned_name):
