@@ -384,6 +384,21 @@ function setAuthStatus(message, type = '') {
     els.authStatus.className = 'auth-status' + (type ? ` ${type}` : '');
 }
 
+function formatApiError(data, fallback = '认证失败') {
+    const detail = data && data.detail;
+    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (Array.isArray(detail)) {
+        const messages = detail
+            .map(item => typeof item === 'string' ? item : item && item.msg)
+            .filter(Boolean);
+        if (messages.length) return messages.join('；');
+    }
+    if (data && typeof data.message === 'string' && data.message.trim()) {
+        return data.message;
+    }
+    return fallback;
+}
+
 async function handleAuthSubmit(event) {
     event.preventDefault();
     const username = els.authUsername.value.trim();
@@ -406,7 +421,7 @@ async function handleAuthSubmit(event) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            throw new Error(data.detail || '认证失败');
+            throw new Error(formatApiError(data));
         }
 
         localStorage.setItem(AUTH_TOKEN_KEY, data.token || '');
