@@ -1,10 +1,49 @@
+import os
+import shutil
+import tempfile
 import unittest
 import uuid
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from main import Source, app
 from contribution_store import prepare_knowledge_entry
+
+# ---------------------------------------------------------------------------
+# AuthFlowTests 隔离：把知识库 JSON 目录与 SQLite 数据库重定向到临时目录，
+# 避免测试把投稿写入真实的 backend/knowledge/ 与 backend/data/*.db。
+# （main 的路由处理器在请求时读取模块级路径常量，import 之后改值即生效）
+# ---------------------------------------------------------------------------
+_ORIG_PATHS: dict[str, Path] = {}
+_TMP_DIR: str | None = None
+
+
+def setUpModule():
+    global _TMP_DIR
+    import auth_store
+    import contribution_store
+
+    _TMP_DIR = tempfile.mkdtemp(prefix="travel_qa_test_")
+    _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"] = contribution_store.KNOWLEDGE_DIR
+    _ORIG_PATHS["contribution_store.DB_PATH"] = contribution_store.DB_PATH
+    _ORIG_PATHS["auth_store.DB_PATH"] = auth_store.DB_PATH
+
+    contribution_store.KNOWLEDGE_DIR = Path(_TMP_DIR) / "knowledge"
+    contribution_store.KNOWLEDGE_DIR.mkdir()
+    contribution_store.DB_PATH = Path(_TMP_DIR) / "data" / "contributions.db"
+    auth_store.DB_PATH = Path(_TMP_DIR) / "data" / "users.db"
+
+
+def tearDownModule():
+    import auth_store
+    import contribution_store
+
+    contribution_store.KNOWLEDGE_DIR = _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"]
+    contribution_store.DB_PATH = _ORIG_PATHS["contribution_store.DB_PATH"]
+    auth_store.DB_PATH = _ORIG_PATHS["auth_store.DB_PATH"]
+    if _TMP_DIR is not None:
+        shutil.rmtree(_TMP_DIR, ignore_errors=True)
 
 
 class ContributionStoreTests(unittest.TestCase):

@@ -24,9 +24,9 @@
 | 💰 预算估算   | "从广州出发去长沙三天两夜，人均花多少钱？" |
 | ⚖️ 对比分析 | "苏州园林和北京颐和园有什么不同？"         |
 
-### 移动端页面
+### 响应式页面（移动端 / PC 端自适应）
 
-系统采用移动优先设计（414px 宽度），PC 端居中显示为手机形态，手机浏览器全屏自适应。支持：
+系统采用 **移动优先 + 桌面自适应** 设计：手机浏览器全屏自适应（414px 宽度基准）；平板（641–1023px）加宽外壳；**PC 端（≥1024px）自动切换为桌面布局**——左侧品牌导航栏 + 顶部工具条 + 居中会话列，历史记录改为右侧抽屉，社区动态呈多列卡片网格。支持：
 
 - 💬 聊天式对话界面，深色极光玻璃拟态（glassmorphism）视觉
 - 📱 城市快捷筛选 chips（点击即选，自动填充示例问题）
@@ -74,6 +74,8 @@
 3. **答案生成**：拼接检索结果 + 系统指令 + 用户问题，调用 DeepSeek API 生成回答
 4. **降级兜底**：API 不可用时直接返回检索片段原文，系统不中断
 
+> **向量索引增量式持久化**：向量/混合检索的语料以快照形式持久化在 `backend/data/vector_index/`（`embeddings.npy` + `manifest.json`）。用户投稿审核通过入库后，下一次检索只会对新增条目做增量编码，不再全库重建（按城市分块对齐，上传到任意城市都只产生小规模增量）。删除该目录、更换 `EMBEDDING_MODEL_NAME` 或提升 `VECTOR_INDEX_VERSION` 可强制全量重建；知识库 JSON 写入通过跨进程文件锁串行化，避免并发上传互相覆盖。
+
 ---
 
 ## 🚀 技术栈
@@ -81,7 +83,7 @@
 | 层级               | 技术                              | 说明                          |
 | ------------------ | --------------------------------- | ----------------------------- |
 | **前端**     | HTML5 + CSS3 + JavaScript（原生） | 零框架依赖，HTML/CSS/JS 三文件分离 |
-| **移动适配** | CSS Media Query + viewport        | 414px 宽度，手机全屏          |
+| **响应式适配** | CSS Media Query + Grid + viewport | 移动全屏 / 平板加宽 / PC（≥1024px）桌面布局 |
 | **后端框架** | FastAPI + Uvicorn                 | 高性能异步，自带 Swagger 文档 |
 | **中文分词** | jieba                             | 分词 + 关键词提取             |
 | **检索算法** | rank-bm25 / 倒排索引 / 文本向量（bge-small-zh） / 混合 | 四种方案可切换，支持一键对比 |
@@ -100,7 +102,7 @@ travel-qa-web/
 ├── .gitignore
 ├── backend/
 │   ├── main.py                 # FastAPI 入口，路由定义
-│   ├── retriever.py            # 检索模块（关键词 + BM25 + 向量 + 混合）
+│   ├── retriever.py            # 检索模块（关键词 + BM25 + 向量 + 混合，向量索引增量持久化）
 │   ├── generator.py            # LLM 调用 + 提示词构造 + 降级方案
 │   ├── city_detector.py        # 城市名识别（从 JSON 自动加载）
 │   ├── knowledge/              # 知识库 JSON 文件（按城市分文件）
@@ -112,6 +114,9 @@ travel-qa-web/
 │   │   ├── guangzhou.json      #   广州（34 条）
 │   │   ├── suzhou.json         #   苏州（34 条）
 │   │   └── changsha.json       #   长沙（34 条）
+│   ├── data/                   # 运行时数据（.gitignore）：vector_index 向量快照、*.db、knowledge.lock
+│   ├── contribution_store.py   # 用户投稿入库（含 JSON 写锁 + 向量缓存增量失效）
+│   ├── test_incremental_vector.py  # 增量向量索引单测（FakeModel，无需真实模型）
 │   ├── requirements.txt        # Python 依赖
 │   ├── .env.example            # 环境变量模板
 │   └── .venv/                  # Python 虚拟环境

@@ -6,10 +6,16 @@
 - 方案C：文本向量相似度检索（sentence-transformers 稠密向量）
 - 方案D：BM25 + 文本向量的混合检索（加权融合）
 支持城市过滤，优先匹配指定城市的知识片段
+
+向量索引使用增量式持久化快照（backend/data/vector_index/）：
+新增知识条目入库后，下一次向量/混合检索只会对新条目做编码，
+不再全库重建。删除快照目录、更换 EMBEDDING_MODEL_NAME 或
+提升 VECTOR_INDEX_VERSION 均可强制全量重建。
 """
 
 import json
 import os
+import threading
 from pathlib import Path
 
 import jieba
@@ -32,9 +38,14 @@ _inverted_index_cache: dict[str, dict[str, set[int]]] = {}
 # 向量检索相关缓存
 _vector_model = None
 _vector_corpus: np.ndarray | None = None
+_vector_city_ids: dict[str, list[str]] | None = None  # 城市 -> 条目 id 列表（快照对齐基准）
 _vector_status: str = "not_loaded"  # not_loaded / ready / unavailable
+_vector_lock = threading.Lock()
 _VECTOR_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5")
 _VECTOR_QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章："
+# 向量索引持久化目录与版本（版本/模型变更 → 自动全量重建）
+VECTOR_INDEX_DIR = Path(__file__).parent / "data" / "vector_index"
+VECTOR_INDEX_VERSION = 1
 # jieba 分词词典初始化标志
 _jieba_initialized: bool = False
 
@@ -339,43 +350,44 @@ def get_vector_status() -> str:
     return _vector_status
 
 
-def _init_vector_index(entries: list[dict]) -> np.ndarray | None:
-    """懒加载向量模型并对全部条目编码（首次调用会下载模型）"""
-    global _vector_model, _vector_corpus, _vector_status
-    if _vector_corpus is not None:
-        return _vector_corpus
+def invalidate_vector_cache() -> None:
+    """知识库新增条目后调用：仅清空内存中的向量语料。
+
+    磁盘快照保留，下次向量/混合检索时自动加载快照，
+    并且只对新增条目做增量编码，不再全库重建。
+    """
+    global _vector_corpus, _vector_city_ids, _vector_status
+    with _vector_lock:
+        _vector_corpus = None
+        _vector_city_ids = None
+        _vector_status = "not_loaded"
+
+
+# ============================================================
+# 向量索引持久化（增量式快照）
+# ============================================================
+
+
+def _load_vector_model():
+    """加载向量模型（已加载则直接复用）；失败返回 None"""
+    global _vector_model
+    if _vector_model is not None:
+        return _vector_model
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError:
-        _vector_status = "unavailable"
-        print("[WARNING] sentence-transformers 未安装，向量检索不可用")
         return None
     try:
-        if _vector_model is None:
-            print(f"[INFO] 加载向量模型: {_VECTOR_MODEL_NAME} ...")
-            # 先尝试从本地缓存加载（已下载过则秒级加载）
-            try:
-                _vector_model = SentenceTransformer(
-                    _VECTOR_MODEL_NAME, local_files_only=True
-                )
-            except Exception:
-                # 缓存未命中，尝试自动下载（国内网络建议设置 HF_ENDPOINT=https://hf-mirror.com）
-                print("[INFO] 本地缓存未命中，尝试自动下载模型...")
-                _vector_model = SentenceTransformer(_VECTOR_MODEL_NAME)
-        texts = [_build_search_text(entry) for entry in entries]
-        vectors = _vector_model.encode(
-            texts,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-            batch_size=32,
-        )
-        _vector_corpus = np.asarray(vectors, dtype=np.float32)
-        _vector_status = "ready"
-        print(
-            f"[INFO] 向量索引构建完成：共 {len(entries)} 条，维度 {_vector_corpus.shape[1]}"
-        )
+        try:
+            _vector_model = SentenceTransformer(
+                _VECTOR_MODEL_NAME, local_files_only=True
+            )
+        except Exception:
+            # 缓存未命中，尝试自动下载（国内网络建议设置 HF_ENDPOINT=https://hf-mirror.com）
+            print("[INFO] 本地缓存未命中，尝试自动下载模型...")
+            _vector_model = SentenceTransformer(_VECTOR_MODEL_NAME)
+        return _vector_model
     except Exception as e:
-        _vector_status = "unavailable"
         print(f"[WARNING] 向量模型加载失败：{e}")
         print(
             "[HINT] 首次使用需先下载模型（国内网络可先设置 "
@@ -384,7 +396,236 @@ def _init_vector_index(entries: list[dict]) -> np.ndarray | None:
             f"SentenceTransformer('{_VECTOR_MODEL_NAME}')\""
         )
         return None
-    return _vector_corpus
+
+
+def _snapshot_paths() -> tuple[Path, Path]:
+    """返回向量快照文件路径（向量矩阵 + manifest）"""
+    return VECTOR_INDEX_DIR / "embeddings.npy", VECTOR_INDEX_DIR / "manifest.json"
+
+
+def _group_ids_by_city(entries: list[dict]) -> dict[str, list[str]]:
+    """按城市分组（组内保持条目顺序），作为快照对齐的基准。
+
+    知识库按城市分文件组织，同一城市的条目在全局列表中连续出现，
+    因此“城市块顺序 + 块内顺序”与全局条目顺序一一对应。
+    """
+    city_ids: dict[str, list[str]] = {}
+    for entry in entries:
+        city = entry.get("city", "未知")
+        city_ids.setdefault(city, []).append(entry.get("id") or "")
+    return city_ids
+
+
+def _load_vector_snapshot() -> tuple[np.ndarray | None, dict[str, list[str]] | None]:
+    """读取磁盘快照；缺失、版本不符或损坏时返回 (None, None)"""
+    emb_path, manifest_path = _snapshot_paths()
+    if not emb_path.exists() or not manifest_path.exists():
+        return None, None
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        embeddings = np.load(emb_path)
+    except Exception as e:
+        print(f"[WARNING] 向量快照读取失败，将执行全量重建：{e}")
+        return None, None
+
+    cities = manifest.get("cities")
+    if (
+        manifest.get("model") != _VECTOR_MODEL_NAME
+        or manifest.get("version") != VECTOR_INDEX_VERSION
+        or not isinstance(embeddings, np.ndarray)
+        or embeddings.ndim != 2
+        or not isinstance(cities, list)
+    ):
+        return None, None
+
+    city_ids: dict[str, list[str]] = {}
+    offset = 0
+    for block in cities:
+        ids = block.get("ids")
+        if not isinstance(ids, list) or block.get("count") != len(ids):
+            return None, None
+        city_ids[block.get("city", "未知")] = ids
+        offset += len(ids)
+    if offset != embeddings.shape[0]:
+        return None, None
+    return np.asarray(embeddings, dtype=np.float32), city_ids
+
+
+def _save_vector_snapshot(
+    embeddings: np.ndarray, city_ids: dict[str, list[str]]
+) -> None:
+    """原子写快照（临时文件 + rename），并发写不会损坏"""
+    VECTOR_INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    emb_path, manifest_path = _snapshot_paths()
+    manifest = {
+        "model": _VECTOR_MODEL_NAME,
+        "version": VECTOR_INDEX_VERSION,
+        "cities": [
+            {"city": city, "count": len(ids), "ids": ids}
+            for city, ids in city_ids.items()
+        ],
+    }
+    tmp_emb = emb_path.with_name(f"{emb_path.stem}.{os.getpid()}.tmp.npy")
+    tmp_manifest = manifest_path.with_name(
+        f"{manifest_path.stem}.{os.getpid()}.tmp.json"
+    )
+    np.save(tmp_emb, embeddings)
+    with open(tmp_manifest, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False)
+    os.replace(tmp_emb, emb_path)
+    os.replace(tmp_manifest, manifest_path)
+
+
+def _encode_incremental(
+    entries: list[dict],
+    old_emb: np.ndarray,
+    old_city_ids: dict[str, list[str]],
+    model,
+) -> tuple[np.ndarray, int]:
+    """按城市块增量编码：旧条目从快照矩阵复用，仅新条目编码。
+
+    返回 (与 entries 严格按位置对齐的新语料矩阵, 新增条目数)。
+    依赖前提：当前各城市的条目列表是旧快照对应城市列表的“后缀扩展”。
+    """
+    # 旧矩阵各城市块的起始行
+    block_start: dict[str, int] = {}
+    offset = 0
+    for city, ids in old_city_ids.items():
+        block_start[city] = offset
+        offset += len(ids)
+
+    # 找出“新条目”：在其所属城市块内的位置 >= 旧块长度
+    new_indices: list[int] = []
+    city_pos: dict[str, int] = {}
+    for idx, entry in enumerate(entries):
+        city = entry.get("city", "未知")
+        pos = city_pos.get(city, 0)
+        city_pos[city] = pos + 1
+        if pos >= len(old_city_ids.get(city, [])):
+            new_indices.append(idx)
+
+    if new_indices:
+        new_vecs = model.encode(
+            [_build_search_text(entries[i]) for i in new_indices],
+            normalize_embeddings=True,
+            show_progress_bar=False,
+            batch_size=32,
+        )
+        new_vecs = np.asarray(new_vecs, dtype=np.float32)
+    else:
+        new_vecs = np.empty((0, old_emb.shape[1]), dtype=np.float32)
+
+    corpus = np.empty((len(entries), old_emb.shape[1]), dtype=np.float32)
+    new_vec_by_idx = dict(zip(new_indices, new_vecs))
+    city_pos = {}
+    for idx, entry in enumerate(entries):
+        city = entry.get("city", "未知")
+        pos = city_pos.get(city, 0)
+        city_pos[city] = pos + 1
+        if idx in new_vec_by_idx:
+            corpus[idx] = new_vec_by_idx[idx]
+        else:
+            corpus[idx] = old_emb[block_start[city] + pos]
+    return corpus, len(new_indices)
+
+
+def _init_vector_index(entries: list[dict]) -> np.ndarray | None:
+    """构建/加载向量索引（首次调用会下载模型）。
+
+    优先级：
+    1. 磁盘快照与当前库完全一致 → 直接加载，零编码
+    2. 快照是当前库的“按城市前缀” → 只增量编码新增条目
+    3. 其余情况（版本/模型变更、数据被改动）→ 全量重建
+    """
+    global _vector_corpus, _vector_city_ids, _vector_status
+    if _vector_corpus is not None:
+        return _vector_corpus
+    with _vector_lock:
+        if _vector_corpus is not None:
+            return _vector_corpus
+
+        current_city_ids = _group_ids_by_city(entries)
+        snapshot_emb, snapshot_city_ids = _load_vector_snapshot()
+
+        # 1) 快照命中：当前库与快照完全一致，零编码加载
+        if snapshot_emb is not None and snapshot_city_ids == current_city_ids:
+            if _load_vector_model() is None:
+                _vector_status = "unavailable"
+                return None
+            _vector_corpus = snapshot_emb
+            _vector_city_ids = current_city_ids
+            _vector_status = "ready"
+            print(
+                f"[INFO] 向量索引从快照加载：{len(entries)} 条"
+                f"（{len(current_city_ids)} 个城市）"
+            )
+            return _vector_corpus
+
+        # 2) 增量更新：旧快照是当前库的“按城市前缀”
+        if snapshot_emb is not None and all(
+            current_city_ids.get(city, [])[: len(ids)] == ids
+            for city, ids in snapshot_city_ids.items()
+        ):
+            model = _load_vector_model()
+            if model is None:
+                _vector_status = "unavailable"
+                return None
+            try:
+                corpus, new_count = _encode_incremental(
+                    entries, snapshot_emb, snapshot_city_ids, model
+                )
+                _save_vector_snapshot(corpus, current_city_ids)
+                _vector_corpus = corpus
+                _vector_city_ids = current_city_ids
+                _vector_status = "ready"
+                print(
+                    f"[INFO] 向量索引增量更新：新增 {new_count} 条"
+                    f"（共 {len(entries)} 条，{len(current_city_ids)} 个城市）"
+                )
+                return _vector_corpus
+            except Exception as e:
+                print(f"[WARNING] 向量索引增量更新失败：{e}")
+                _vector_status = "unavailable"
+                return None
+
+        # 3) 全量重建
+        try:
+            model = _load_vector_model()
+            if model is None:
+                _vector_status = "unavailable"
+                return None
+            texts = [_build_search_text(entry) for entry in entries]
+            vectors = model.encode(
+                texts,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+                batch_size=32,
+            )
+            corpus = np.asarray(vectors, dtype=np.float32)
+            _save_vector_snapshot(corpus, current_city_ids)
+            _vector_corpus = corpus
+            _vector_city_ids = current_city_ids
+            _vector_status = "ready"
+            print(
+                f"[INFO] 向量索引全量构建完成：共 {len(entries)} 条，"
+                f"维度 {corpus.shape[1]}"
+            )
+        except Exception as e:
+            _vector_status = "unavailable"
+            print(f"[WARNING] 向量模型加载失败：{e}")
+            return None
+        return _vector_corpus
+
+
+def _get_corpus_for(entries: list[dict]) -> np.ndarray | None:
+    """获取与 entries 严格位置对齐的向量语料（带对齐防御）"""
+    corpus = _init_vector_index(entries)
+    if corpus is not None and len(corpus) != len(entries):
+        print("[WARNING] 向量语料与条目数不一致，强制重建向量索引")
+        invalidate_vector_cache()
+        corpus = _init_vector_index(entries)
+    return corpus
 
 
 def _embed_query(question: str) -> np.ndarray | None:
@@ -440,7 +681,7 @@ def search_vector(
     if not all_entries:
         return []
 
-    corpus = _init_vector_index(all_entries)
+    corpus = _get_corpus_for(all_entries)
     if corpus is None:
         return []
 
@@ -503,7 +744,7 @@ def search_hybrid(
     question_tokens = list(jieba.cut(question))
     bm25_scores = _bm25_index.get_scores(question_tokens)
 
-    corpus = _init_vector_index(all_entries)
+    corpus = _get_corpus_for(all_entries)
     if corpus is None:
         print("[INFO] 向量模型不可用，混合检索降级为 BM25")
         return search_bm25(question, city=city, top_k=top_k, city_boost=city_boost)
