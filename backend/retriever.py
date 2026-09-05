@@ -69,10 +69,19 @@ def load_knowledge_base() -> list[dict]:
                 entries = json.load(f)
                 if isinstance(entries, list):
                     # 过滤掉 _meta 元数据条目，不作为可检索的知识
-                    entries = [e for e in entries if e.get("id") != "_meta"]
+                    entries = [
+                        e
+                        for e in entries
+                        if isinstance(e, dict) and e.get("id") != "_meta"
+                    ]
                     all_entries.extend(entries)
                 elif isinstance(entries, dict):
-                    all_entries.append(entries)
+                    # 兼容 {_meta, items} 格式；普通单条对象仍可直接加载。
+                    items = entries.get("items")
+                    if isinstance(items, list):
+                        all_entries.extend(e for e in items if isinstance(e, dict))
+                    elif entries.get("id") != "_meta":
+                        all_entries.append(entries)
         except (json.JSONDecodeError, IOError) as e:
             print(f"[WARNING] 读取知识库文件失败 {json_file}: {e}")
 
