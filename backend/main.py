@@ -118,7 +118,7 @@ class AuthUser(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., description="用户名", min_length=3, max_length=30)
+    username: str = Field(..., description="用户名")
     password: str = Field(..., description="密码", min_length=6, max_length=128)
 
 
