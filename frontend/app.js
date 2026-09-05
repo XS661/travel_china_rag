@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    走遍中国 · 智能旅游助手 — 交互逻辑
    API 契约保持不变：/api/cities /api/ask /api/health
    ============================================================ */
@@ -40,16 +40,6 @@ const els = {
     compareCard: $('compare-card'),
     toast: $('toast'),
     authBtn: $('auth-btn'),
-    userHomeBtn: $('user-home-btn'),
-    userHomePanel: $('user-home-panel'),
-    userHomeList: $('user-home-list'),
-    userHomeTitle: $('user-home-title'),
-    userHomeClose: $('user-home-close'),
-    communityBtn: $('community-btn'),
-    communityPanel: $('community-panel'),
-    communityList: $('community-list'),
-    communityTitle: $('community-title'),
-    communityClose: $('community-close'),
     authModal: $('auth-modal'),
     authBackdrop: $('auth-backdrop'),
     authClose: $('auth-close'),
@@ -62,8 +52,17 @@ const els = {
     sheet: $('history-sheet'),
     sheetBackdrop: $('sheet-backdrop'),
     historyList: $('history-list'),
-    contributeToggle: $('contribute-toggle'),
-    contributePanel: $('contribute-panel'),
+    tabbar: $('tabbar'),
+    communityTitle: $('community-title'),
+    communityList: $('community-list'),
+    communityRefresh: $('community-refresh'),
+    meUserCard: $('me-user-card'),
+    meTabs: document.querySelectorAll('.me-tab'),
+    meContent: $('me-content'),
+    meLogout: $('me-logout'),
+    uploadForm: $('upload-form'),
+    uploadGate: $('upload-gate'),
+    uploadLoginBtn: $('upload-login-btn'),
     contributeCity: $('contribute-city'),
     contributeTitle: $('contribute-title'),
     contributeContent: $('contribute-content'),
@@ -74,6 +73,8 @@ const els = {
 
 let currentMethod = 'bm25';
 let currentCity = '';
+let currentView = 'home';        // 当前激活的页面视图
+let currentMeSection = 'history'; // 我的页当前分区
 let abortController = null;
 let typingTimer = null;
 let toastTimer = null;
@@ -82,6 +83,7 @@ window._cityList = []; // 全局城市名缓存，供 extractCityFromQuestion �
 const AUTH_TOKEN_KEY = 'travel_qa_token';
 const AUTH_USER_KEY = 'travel_qa_user';
 const HISTORY_MODE_KEY = 'travel_qa_history_scope';
+const FOLLOWS_KEY = 'travel_qa_follows';
 
 // 对比模式：仅通过 /compare 地址进入
 if (compareMode) {
@@ -238,21 +240,74 @@ function bindEvents() {
         runQuickQuery(btn.dataset.q);
     });
 
-    // 知识贡献开关
-    els.contributeToggle.addEventListener('click', () => {
-        if (!getToken()) {
-            openAuthModal();
-            setAuthStatus('请先登录后再提交旅游经验', 'warn');
+    // 底部导航栏：页面切换
+    els.tabbar.addEventListener('click', (e) => {
+        const item = e.target.closest('.tab-item');
+        if (!item) return;
+        switchView(item.dataset.view);
+    });
+
+    // 社区刷新
+    els.communityRefresh.addEventListener('click', () => {
+        loadCommunityPosts();
+        showToast('社区已刷新', 'info');
+    });
+
+    // 我的页分区切换
+    els.meTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            currentMeSection = tab.dataset.section || 'history';
+            els.meTabs.forEach(t => t.classList.toggle('active', t === tab));
+            renderMeSection();
+        });
+    });
+    els.meLogout.addEventListener('click', logoutUser);
+
+    // 上传页：未登录引导 + 表单提交
+    els.uploadLoginBtn.addEventListener('click', () => {
+        openAuthModal();
+        setAuthStatus('请先登录后再提交旅游经验', 'warn');
+    });
+    els.uploadForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitContribution();
+    });
+    els.contributeFile.addEventListener('change', () => {
+        const file = els.contributeFile.files && els.contributeFile.files[0];
+        const label = document.getElementById('upload-file-name');
+        if (label) label.textContent = file ? file.name : '上传文件';
+    });
+
+    // 社区列表内：关注 / 取消关注
+    els.communityList.addEventListener('click', async (e) => {
+        const followBtn = e.target.closest('.follow-btn');
+        if (followBtn) {
+            await toggleFollowByName(followBtn.dataset.username, followBtn);
             return;
         }
-        const hidden = els.contributePanel.hidden;
-        els.contributePanel.hidden = !hidden;
-        if (!els.contributePanel.hidden) {
-            els.contributeCity.focus();
+        const viewBtn = e.target.closest('.follow-view');
+        if (viewBtn) {
+            switchView('community', { skipLoad: true });
+            await loadCommunityPosts(viewBtn.dataset.username);
+            return;
         }
     });
 
-    els.submitContribution.addEventListener('click', submitContribution);
+    // 我的页内容内：查看 TA 的帖子 / 取消关注
+    els.meContent.addEventListener('click', async (e) => {
+        const viewBtn = e.target.closest('.follow-view');
+        if (viewBtn) {
+            switchView('community', { skipLoad: true });
+            await loadCommunityPosts(viewBtn.dataset.username);
+            return;
+        }
+        const unBtn = e.target.closest('.follow-un');
+        if (unBtn) {
+            removeFollow(unBtn.dataset.username);
+            renderFollows();
+            return;
+        }
+    });
 
     els.authBtn.addEventListener('click', () => {
         const token = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -262,20 +317,6 @@ function bindEvents() {
         }
         openAuthModal();
     });
-
-    els.userHomeBtn.addEventListener('click', async () => {
-        if (!getToken()) {
-            openAuthModal();
-            setAuthStatus('请先登录后查看我的主页', 'warn');
-            return;
-        }
-        await openUserHome();
-    });
-    els.userHomeClose.addEventListener('click', closeUserHome);
-    els.communityBtn.addEventListener('click', async () => {
-        await openCommunityHome();
-    });
-    els.communityClose.addEventListener('click', closeCommunityHome);
 
     els.authBackdrop.addEventListener('click', closeAuthModal);
     els.authClose.addEventListener('click', closeAuthModal);
@@ -316,16 +357,15 @@ function setAuthUi() {
     if (user && token) {
         els.authBtn.textContent = `已登录 · ${user.username}`;
         els.authBtn.title = `已登录：${user.username}`;
-        els.userHomeBtn.hidden = false;
-        els.contributeToggle.disabled = false;
         localStorage.setItem(HISTORY_MODE_KEY, 'user');
     } else {
         els.authBtn.textContent = '登录';
         els.authBtn.title = '登录/注册';
-        els.userHomeBtn.hidden = true;
-        els.contributeToggle.disabled = true;
         localStorage.setItem(HISTORY_MODE_KEY, 'guest');
     }
+    // 联动刷新当前视图（我的 / 上传经验）
+    if (currentView === 'me') renderMeView();
+    if (currentView === 'upload') renderUploadView();
 }
 
 function openAuthModal() {
@@ -594,7 +634,7 @@ function pushAiMessage(data) {
             const username = (button.dataset.username || '').trim();
             const sourceTitle = button.textContent.trim();
             const sourceCity = button.closest('.src-chip')?.parentElement?.dataset?.city || '';
-            els.communityPanel.hidden = false;
+            switchView('community', { skipLoad: true });
             if (!sourceId && username) {
                 await loadCommunityPosts(username);
                 return;
@@ -905,9 +945,11 @@ async function submitContribution() {
             els.contributeTitle.value = '';
             els.contributeCity.value = '';
             els.contributeFile.value = '';
-            els.contributePanel.hidden = true;
-            if (!els.userHomePanel.hidden) {
-                await loadUserHomePosts();
+            const fileLabel = document.getElementById('upload-file-name');
+            if (fileLabel) fileLabel.textContent = '上传文件';
+            // 若正停留在「我的 - 投稿」分区，刷新列表
+            if (currentView === 'me' && currentMeSection === 'posts') {
+                await renderMeSection();
             }
         } else {
             setContributionStatus(data.reason || '提交未通过审核', 'warn');
@@ -924,25 +966,157 @@ function setContributionStatus(message, type = 'info') {
     els.contributeStatus.className = `contribute-status ${type}`;
 }
 
-async function openUserHome() {
+// ========== 页面视图切换 ==========
+function switchView(name, opts = {}) {
+    currentView = name || 'home';
+    // 导航栏激活态
+    els.tabbar.querySelectorAll('.tab-item').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === currentView);
+    });
+    // 视图激活态
+    document.querySelectorAll('.view').forEach(v => {
+        v.classList.toggle('active', v.dataset.view === currentView);
+    });
+    closeSheet();
+    hideToast();
+    // 懒加载各页数据（skipLoad 用于需要自行加载数据的场景，避免竞态）
+    if (opts.skipLoad) return;
+    if (currentView === 'community') {
+        loadCommunityPosts();
+    } else if (currentView === 'upload') {
+        renderUploadView();
+    } else if (currentView === 'me') {
+        renderMeView();
+    }
+}
+
+// ========== 上传经验页 ==========
+function renderUploadView() {
+    const loggedIn = !!getToken();
+    els.uploadForm.hidden = !loggedIn;
+    els.uploadGate.hidden = loggedIn;
+    if (loggedIn) els.contributeStatus.textContent = '';
+}
+
+// ========== 我的页 ==========
+async function renderMeView() {
     const user = getCurrentUser();
-    if (!user) return;
-    els.userHomeTitle.textContent = `${user.username} 的帖子`;
-    els.userHomePanel.hidden = false;
-    await loadUserHomePosts();
+    const token = getToken();
+    if (user && token) {
+        const initial = (user.username || '我').trim().charAt(0).toUpperCase();
+        els.meUserCard.innerHTML = `
+            <div class="me-avatar">${escapeHtml(initial)}</div>
+            <div class="me-info">
+                <div class="me-name">${escapeHtml(user.username)}</div>
+                <div class="me-sub">已登录 · 历史与投稿已同步到云端</div>
+            </div>`;
+        els.meLogout.hidden = false;
+    } else {
+        els.meUserCard.innerHTML = `
+            <div class="me-avatar">👤</div>
+            <div class="me-info">
+                <div class="me-name">未登录</div>
+                <div class="me-sub">登录后体验投稿、历史同步等功能</div>
+            </div>
+            <button type="button" class="primary-btn me-login-btn" id="me-login-btn">立即登录 / 注册</button>`;
+        els.meLogout.hidden = true;
+        const loginBtn = document.getElementById('me-login-btn');
+        if (loginBtn) loginBtn.addEventListener('click', () => openAuthModal());
+    }
+    renderMeSection();
 }
 
-function closeUserHome() {
-    els.userHomePanel.hidden = true;
+function renderMeSection() {
+    if (currentMeSection === 'history') {
+        renderHistoryInto(els.meContent, { navigateHome: true });
+    } else if (currentMeSection === 'follows') {
+        renderFollows();
+    } else if (currentMeSection === 'posts') {
+        if (!getToken()) {
+            els.meContent.innerHTML = '<div class="home-empty">登录后即可查看自己的投稿。</div>';
+            return;
+        }
+        loadUserHomePosts(els.meContent);
+    }
 }
 
-function closeCommunityHome() {
-    els.communityPanel.hidden = true;
+// ========== 关注列表（localStorage 本地实现） ==========
+function getFollows() {
+    try {
+        const list = JSON.parse(localStorage.getItem(FOLLOWS_KEY) || '[]');
+        return Array.isArray(list) ? list : [];
+    } catch (e) {
+        return [];
+    }
 }
 
-async function openCommunityHome() {
-    els.communityPanel.hidden = false;
-    await loadCommunityPosts();
+function saveFollows(list) {
+    try { localStorage.setItem(FOLLOWS_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+}
+
+function isFollowing(username) {
+    const name = (username || '').trim();
+    if (!name) return false;
+    return getFollows().some(f => f.username === name);
+}
+
+async function toggleFollowByName(username, btn) {
+    const name = (username || '').trim();
+    if (!name) return;
+    let list = getFollows();
+    if (isFollowing(name)) {
+        list = list.filter(f => f.username !== name);
+        saveFollows(list);
+        if (btn) {
+            btn.textContent = '关注';
+            btn.classList.remove('following');
+            btn.title = '关注该作者';
+        }
+        showToast(`已取消关注 ${name}`, 'info');
+    } else {
+        list.push({ username: name, followedAt: new Date().toISOString() });
+        saveFollows(list);
+        if (btn) {
+            btn.textContent = '已关注';
+            btn.classList.add('following');
+            btn.title = '点击取消关注';
+        }
+        showToast(`已关注 ${name}`, 'ok');
+    }
+}
+
+function removeFollow(username) {
+    const name = (username || '').trim();
+    if (!name) return;
+    saveFollows(getFollows().filter(f => f.username !== name));
+    showToast(`已取消关注 ${name}`, 'info');
+}
+
+function renderFollows() {
+    const list = getFollows();
+    if (!list.length) {
+        els.meContent.innerHTML = `
+            <div class="home-empty">
+                还没有关注任何人<br>
+                去 <button type="button" class="inline-link" id="go-community">社区</button> 看看有趣的旅行者吧
+            </div>`;
+        const go = document.getElementById('go-community');
+        if (go) go.addEventListener('click', () => switchView('community'));
+        return;
+    }
+    els.meContent.innerHTML = list.map(f => `
+        <div class="follow-item">
+            <div class="follow-avatar">${escapeHtml((f.username || '?').charAt(0).toUpperCase())}</div>
+            <div class="follow-info">
+                <div class="follow-name">${escapeHtml(f.username)}</div>
+                <div class="follow-sub">关注于 ${formatTime(f.followedAt)}</div>
+            </div>
+            <div class="follow-actions">
+                <button type="button" class="follow-view" data-username="${escapeHtml(f.username)}">看TA的帖子</button>
+                <button type="button" class="follow-un" data-username="${escapeHtml(f.username)}">取消</button>
+            </div>
+        </div>
+    `).join('');
 }
 
 async function loadCommunityPosts(username = '') {
@@ -960,14 +1134,20 @@ async function loadCommunityPosts(username = '') {
 
         const title = username ? `${username} 的社区主页` : '用户动态';
         els.communityTitle.textContent = title;
-        els.communityList.innerHTML = posts.map((post) => `
+        els.communityList.innerHTML = posts.map((post) => {
+            const author = (post.username || '').trim();
+            const followBtn = author
+                ? `<button type="button" class="follow-btn${isFollowing(author) ? ' following' : ''}" data-username="${escapeHtml(author)}" title="${isFollowing(author) ? '点击取消关注' : '关注该作者'}">${isFollowing(author) ? '已关注' : '关注'}</button>`
+                : '';
+            return `
             <article class="user-post-card community-post-card" data-post-id="${escapeHtml(post.id || '')}">
                 <div class="post-topline">
                     <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
                     <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
                 </div>
                 <div class="community-author-line">
-                    <span>作者：${escapeHtml(post.username || '用户')}</span>
+                    <span>作者：${escapeHtml(author || '用户')}</span>
+                    ${followBtn}
                 </div>
                 <h4>${escapeHtml(post.title || '旅游心得')}</h4>
                 <p>${escapeHtml((post.content || '').slice(0, 180))}${(post.content || '').length > 180 ? '…' : ''}</p>
@@ -976,7 +1156,7 @@ async function loadCommunityPosts(username = '') {
                     <span>${escapeHtml(post.username || '用户')}</span>
                 </div>
             </article>
-        `).join('');
+        `}).join('');
 
         els.communityList.querySelectorAll('.community-post-card').forEach((card) => {
             card.addEventListener('click', async () => {
@@ -1027,7 +1207,7 @@ async function openCommunityPostDetail(postId, username = '', sourceTitle = '', 
         if (authorName) {
             await loadCommunityPosts(authorName);
         } else {
-            els.communityPanel.hidden = false;
+            switchView('community', { skipLoad: true });
             els.communityTitle.textContent = '用户动态';
             await loadCommunityPosts();
         }
@@ -1049,8 +1229,11 @@ async function openCommunityPostDetail(postId, username = '', sourceTitle = '', 
             throw new Error('社区帖子获取失败');
         }
         const post = await res.json();
-        const displayAuthor = post.username || authorName || '用户';
-        els.communityTitle.textContent = `${displayAuthor} 的社区主页`;
+        const displayAuthor = (post.username || authorName || '').trim();
+        const followBtn = displayAuthor
+            ? `<button type="button" class="follow-btn${isFollowing(displayAuthor) ? ' following' : ''}" data-username="${escapeHtml(displayAuthor)}" title="${isFollowing(displayAuthor) ? '点击取消关注' : '关注该作者'}">${isFollowing(displayAuthor) ? '已关注' : '关注'}</button>`
+            : '';
+        els.communityTitle.textContent = `${displayAuthor || '用户'} 的社区主页`;
         els.communityList.innerHTML = `
             <div class="user-post-detail community-post-detail">
                 <button type="button" class="back-link" data-action="back-to-community">← 返回社区</button>
@@ -1059,7 +1242,8 @@ async function openCommunityPostDetail(postId, username = '', sourceTitle = '', 
                     <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
                 </div>
                 <div class="community-author-line">
-                    <span>作者：${escapeHtml(displayAuthor)}</span>
+                    <span>作者：${escapeHtml(displayAuthor || '用户')}</span>
+                    ${followBtn}
                 </div>
                 <h4>${escapeHtml(post.title || '旅游心得')}</h4>
                 <div class="post-detail-source">${escapeHtml(post.source || '用户亲身经历')}</div>
@@ -1073,15 +1257,16 @@ async function openCommunityPostDetail(postId, username = '', sourceTitle = '', 
         }
     } catch (err) {
         console.warn(err);
-        els.communityPanel.hidden = false;
+        switchView('community', { skipLoad: true });
         els.communityTitle.textContent = '用户动态';
         await loadCommunityPosts();
     }
 }
 
-async function loadUserHomePosts() {
+async function loadUserHomePosts(container = els.meContent) {
     const token = getToken();
     if (!token) return;
+    if (!container) return;
 
     try {
         const res = await fetch(`${API_BASE}/api/my-contributions`, {
@@ -1096,11 +1281,11 @@ async function loadUserHomePosts() {
         }
         const posts = await res.json();
         if (!posts.length) {
-            els.userHomeList.innerHTML = '<div class="home-empty">还没有发布过心得，快去投稿吧。</div>';
+            container.innerHTML = '<div class="home-empty">还没有发布过心得，快去上传经验吧。</div>';
             return;
         }
 
-        els.userHomeList.innerHTML = posts.map((post) => `
+        container.innerHTML = posts.map((post) => `
             <article class="user-post-card" data-post-id="${escapeHtml(post.id || '')}">
                 <div class="post-topline">
                     <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
@@ -1115,22 +1300,23 @@ async function loadUserHomePosts() {
             </article>
         `).join('');
 
-        els.userHomeList.querySelectorAll('.user-post-card').forEach((card) => {
+        container.querySelectorAll('.user-post-card').forEach((card) => {
             card.addEventListener('click', async () => {
                 const postId = card.dataset.postId;
                 if (!postId) return;
-                await openUserPostDetail(postId);
+                await openUserPostDetail(postId, container);
             });
         });
     } catch (err) {
-        els.userHomeList.innerHTML = '<div class="home-empty">帖子加载失败，请稍后重试。</div>';
+        container.innerHTML = '<div class="home-empty">帖子加载失败，请稍后重试。</div>';
         console.warn(err);
     }
 }
 
-async function openUserPostDetail(postId) {
+async function openUserPostDetail(postId, container = els.meContent) {
     const token = getToken();
     if (!token) return;
+    if (!container) return;
 
     try {
         const res = await fetch(`${API_BASE}/api/my-contributions/${postId}`, {
@@ -1144,9 +1330,9 @@ async function openUserPostDetail(postId) {
             throw new Error('获取帖子详情失败');
         }
         const post = await res.json();
-        els.userHomeList.innerHTML = `
+        container.innerHTML = `
             <div class="user-post-detail">
-                <button type="button" class="back-link" data-action="back-to-list">← 返回我的主页</button>
+                <button type="button" class="back-link" data-action="back-to-list">← 返回我的投稿</button>
                 <div class="post-detail-header">
                     <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
                     <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
@@ -1160,12 +1346,12 @@ async function openUserPostDetail(postId) {
             </div>
         `;
 
-        const backBtn = els.userHomeList.querySelector('[data-action="back-to-list"]');
+        const backBtn = container.querySelector('[data-action="back-to-list"]');
         if (backBtn) {
-            backBtn.addEventListener('click', () => loadUserHomePosts());
+            backBtn.addEventListener('click', () => loadUserHomePosts(container));
         }
 
-        const deleteBtn = els.userHomeList.querySelector('[data-action="delete-post"]');
+        const deleteBtn = container.querySelector('[data-action="delete-post"]');
         if (deleteBtn) {
             deleteBtn.addEventListener('click', async () => {
                 const confirmDelete = window.confirm('确定删除这篇帖子吗？');
@@ -1179,7 +1365,7 @@ async function openUserPostDetail(postId) {
                     return;
                 }
                 showToast('帖子已删除', 'ok');
-                await loadUserHomePosts();
+                await loadUserHomePosts(container);
             });
         }
     } catch (err) {
@@ -1279,21 +1465,22 @@ async function saveToHistory(question, data) {
     }
 }
 
-async function renderHistory() {
+async function renderHistoryInto(container, opts = {}) {
     const history = await getHistory();
+    if (!container) return;
     if (history.length === 0) {
-        els.historyList.innerHTML = '<div class="h-empty">暂无问答记录</div>';
+        container.innerHTML = '<div class="h-empty">暂无问答记录</div>';
         return;
     }
-    els.historyList.innerHTML = history.slice(0, 10).map((item, idx) => `
+    container.innerHTML = history.slice(0, 10).map((item, idx) => `
             <div class="history-item" data-idx="${idx}">
                 <div class="h-item-q">${escapeHtml(item.question)}</div>
                 <div class="h-item-meta">${item.detected_city ? '📍 ' + escapeHtml(item.detected_city) + ' · ' : ''}${formatTime(item.timestamp)}</div>
             </div>
         `).join('');
 
-    // 点击历史记录恢复
-    els.historyList.querySelectorAll('.history-item').forEach(el => {
+    // 点击历史记录恢复对话
+    container.querySelectorAll('.history-item').forEach(el => {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx);
             const item = history[idx];
@@ -1303,11 +1490,19 @@ async function renderHistory() {
                     setCityFilter(item.fullData.detected_city);
                 }
                 closeSheet();
+                // 从其它页面恢复时回到主页
+                if (opts.navigateHome || currentView !== 'home') {
+                    switchView('home', { skipLoad: true });
+                }
                 pushUserMessage(item.question);
                 pushAiMessage(item.fullData);
             }
         });
     });
+}
+
+async function renderHistory() {
+    await renderHistoryInto(els.historyList, { navigateHome: true });
 }
 
 async function loadHistory() {
