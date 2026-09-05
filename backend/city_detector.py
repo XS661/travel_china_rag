@@ -12,9 +12,9 @@ from pathlib import Path
 KNOWLEDGE_DIR = Path(__file__).parent / "knowledge"
 
 # === 以下变量在 _load_city_metadata() 中自动填充 ===
-COVERED_CITIES: list[str] = []       # 知识库覆盖的城市名列表
-CITY_ALIASES: dict[str, str] = {}    # 别名 → 城市名映射
-CITY_TAGS: dict[str, str] = {}       # 城市名 → 标签
+COVERED_CITIES: list[str] = []  # 知识库覆盖的城市名列表
+CITY_ALIASES: dict[str, str] = {}  # 别名 → 城市名映射
+CITY_TAGS: dict[str, str] = {}  # 城市名 → 标签
 _metadata_loaded: bool = False
 
 
@@ -34,16 +34,26 @@ def _load_city_metadata():
     for json_file in sorted(KNOWLEDGE_DIR.glob("*.json")):
         try:
             with open(json_file, "r", encoding="utf-8") as f:
-                entries = json.load(f)
+                data = json.load(f)
         except (json.JSONDecodeError, IOError):
             continue
 
-        # 查找 _meta 条目
-        meta = None
-        for entry in entries:
-            if entry.get("id") == "_meta":
-                meta = entry
-                break
+        # 兼容旧的对象数组格式和新的 {_meta, items} 包装格式。
+        if isinstance(data, list):
+            meta = next(
+                (
+                    entry
+                    for entry in data
+                    if isinstance(entry, dict) and entry.get("id") == "_meta"
+                ),
+                None,
+            )
+        elif isinstance(data, dict):
+            meta = data.get("_meta")
+            if not isinstance(meta, dict) and data.get("id") == "_meta":
+                meta = data
+        else:
+            meta = None
 
         city_name = meta.get("city", "") if meta else json_file.stem
         cities.append(city_name)

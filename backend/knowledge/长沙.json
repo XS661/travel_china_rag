@@ -1069,5 +1069,33 @@
     "source": "中国天气网气候资料整理",
     "source_url": "",
     "chunk_id": 1
+  },
+  {
+    "id": "user_长沙_20260905130504_3be204",
+    "domain": "全国旅游",
+    "city": "长沙",
+    "category": "其他",
+    "sub_category": "",
+    "title": "长沙夜游体验",
+    "content": "我在黄兴南路附近散步，晚上可以吃麻辣小龙虾，夜景很适合拍照。",
+    "keywords": [
+      "长沙",
+      "夜游",
+      "体验",
+      "黄兴",
+      "南路",
+      "附近",
+      "散步",
+      "晚上",
+      "可以",
+      "麻辣"
+    ],
+    "source": "用户亲身经历",
+    "source_url": "",
+    "submission_id": "3ac740dc-9f7e-4354-ac57-fa896b9aaf18",
+    "user_id": "3f9e68da-32a3-4500-90ad-209589b1d7e5",
+    "username": "posts_34f188",
+    "chunk_id": 1,
+    "city_tag": "其他"
   }
 ]

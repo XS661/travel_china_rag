@@ -993,5 +993,33 @@
     "source": "中国天气网气候资料整理",
     "source_url": "",
     "chunk_id": 1
+  },
+  {
+    "id": "user_杭州_20260905130504_0fe86c",
+    "domain": "全国旅游",
+    "city": "杭州",
+    "category": "其他",
+    "sub_category": "",
+    "title": "杭州西湖慢游",
+    "content": "我从断桥走到苏堤，傍晚看西湖很安静，适合慢慢散步。",
+    "keywords": [
+      "杭州",
+      "西湖",
+      "慢游",
+      "断桥",
+      "苏堤",
+      "傍晚",
+      "安静",
+      "适合",
+      "慢慢",
+      "散步"
+    ],
+    "source": "用户亲身经历",
+    "source_url": "",
+    "submission_id": "4e251d71-f599-4787-823a-6bc125cedb91",
+    "user_id": "4e44304a-357c-46fc-a747-5a89be0c8dc6",
+    "username": "detail_531942",
+    "chunk_id": 1,
+    "city_tag": "其他"
   }
 ]
