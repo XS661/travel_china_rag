@@ -193,15 +193,20 @@
                     <!-- 用户卡片 -->
                     <div class="me-user-card card-panel" id="me-user-card"></div>
 
+                    <!-- 中国地图（默认视图） -->
+                    <div class="me-map-card card-panel" id="me-map" aria-label="中国地图">
+                        <svg id="china-map" viewBox="0 0 1000 720" role="img" aria-label="中国地图"></svg>
+                    </div>
+
                     <!-- 分区切换 -->
                     <div class="me-tabs" role="tablist" aria-label="我的功能分区">
-                        <button type="button" class="me-tab active" data-section="history" role="tab">历史记录</button>
+                        <button type="button" class="me-tab" data-section="history" role="tab">历史记录</button>
                         <button type="button" class="me-tab" data-section="follows" role="tab">关注列表</button>
                         <button type="button" class="me-tab" data-section="posts" role="tab">我的投稿</button>
                     </div>
 
                     <!-- 分区内容 -->
-                    <div class="me-content" id="me-content"></div>
+                    <div class="me-content" id="me-content" hidden></div>
 
                     <button type="button" class="me-logout" id="me-logout" hidden>退出登录</button>
                 </div>
@@ -293,6 +298,7 @@
         <div class="toast" id="toast" hidden></div>
     </div>
 
+    <script src="/static/china-map.js"></script>
     <script src="/static/app.js"></script>
 </body>
 

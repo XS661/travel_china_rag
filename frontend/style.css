@@ -1773,6 +1773,60 @@
             flex: none;
         }
 
+        .me-map-card {
+            flex: none;
+            padding: 8px 8px 4px;
+            overflow: hidden;
+        }
+
+        #china-map {
+            display: block;
+            width: 100%;
+            height: auto;
+            min-height: 0;
+            max-height: 44vh;
+            touch-action: manipulation;
+        }
+
+        .map-province {
+            fill: #05070d;
+            stroke: rgba(170, 183, 205, 0.42);
+            stroke-width: 1;
+            cursor: pointer;
+            transition: fill 0.2s ease, stroke 0.2s ease;
+        }
+
+        .map-province:hover {
+            fill: rgba(255, 255, 255, 0.09);
+            stroke: rgba(247, 184, 74, 0.72);
+        }
+
+        .map-province.covered {
+            stroke: rgba(63, 217, 255, 0.48);
+        }
+
+        .map-province.has-user-post {
+            fill: rgba(255, 74, 74, 0.58);
+            stroke: rgba(255, 118, 118, 0.9);
+        }
+
+        .map-province.has-user-post:hover {
+            fill: rgba(255, 94, 94, 0.72);
+            stroke: #ffb2b2;
+        }
+
+        .china-map-tooltip {
+            fill: var(--gold-2);
+            font-family: var(--font-display);
+            font-size: 34px;
+            font-weight: 700;
+            pointer-events: none;
+            paint-order: stroke;
+            stroke: rgba(5, 7, 13, 0.75);
+            stroke-width: 2px;
+            text-shadow: 0 3px 10px rgba(5, 7, 13, 0.7);
+        }
+
         .me-tabs {
             flex: none;
             display: grid;
@@ -1815,6 +1869,22 @@
             flex-direction: column;
             gap: 10px;
             animation: fadeUp 0.3s ease both;
+        }
+
+        .map-back-link {
+            width: fit-content;
+            border: none;
+            background: transparent;
+            color: var(--cyan);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .province-posts-head {
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 800;
         }
 
         .me-logout {

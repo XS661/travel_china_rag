@@ -19,6 +19,78 @@ const CITY_EMOJI_MAP = {
 };
 const METHOD_LABELS = { bm25: 'BM25', keyword: '关键词', vector: '向量', hybrid: '混合' };
 
+// 城市名 → 省级行政区名，用于把用户投稿定位到中国地图上的省份
+const CITY_PROVINCE_MAP = {
+    '北京': '北京市',
+    '上海市': '上海市', '重庆': '重庆市', '天津': '天津市',
+    '河北': '河北省', '石家庄': '河北省', '唐山': '河北省', '秦皇岛': '河北省', '邯郸': '河北省', '邢台': '河北省', '保定': '河北省', '张家口': '河北省', '承德': '河北省', '沧州': '河北省', '廊坊': '河北省', '衡水': '河北省',
+    '山西': '山西省', '太原': '山西省', '大同': '山西省', '阳泉': '山西省', '长治': '山西省', '晋城': '山西省', '朔州': '山西省', '晋中': '山西省', '运城': '山西省', '忻州': '山西省', '临汾': '山西省', '吕梁': '山西省',
+    '内蒙古': '内蒙古自治区', '呼和浩特': '内蒙古自治区', '呼伦贝尔': '内蒙古自治区', '包头': '内蒙古自治区', '乌海': '内蒙古自治区', '赤峰': '内蒙古自治区', '通辽': '内蒙古自治区', '鄂尔多斯': '内蒙古自治区', '巴彦淖尔': '内蒙古自治区', '乌兰察布': '内蒙古自治区',
+    '辽宁': '辽宁省', '沈阳': '辽宁省', '大连': '辽宁省', '鞍山': '辽宁省', '抚顺': '辽宁省', '本溪': '辽宁省', '丹东': '辽宁省', '锦州': '辽宁省', '营口': '辽宁省', '阜新': '辽宁省', '辽阳': '辽宁省', '盘锦': '辽宁省', '铁岭': '辽宁省', '朝阳': '辽宁省', '葫芦岛': '辽宁省',
+    '吉林': '吉林省', '长春': '吉林省', '吉林市': '吉林省', '四平': '吉林省', '辽源': '吉林省', '通化': '吉林省', '白山': '吉林省', '松原': '吉林省', '白城': '吉林省', '延边': '吉林省',
+    '黑龙江': '黑龙江省', '哈尔滨': '黑龙江省', '齐齐哈尔': '黑龙江省', '鸡西': '黑龙江省', '鹤岗': '黑龙江省', '双鸭山': '黑龙江省', '大庆': '黑龙江省', '伊春': '黑龙江省', '佳木斯': '黑龙江省', '七台河': '黑龙江省', '牡丹江': '黑龙江省', '黑河': '黑龙江省', '绥化': '黑龙江省',
+    '江苏': '江苏省', '南京': '江苏省', '无锡': '江苏省', '徐州': '江苏省', '常州': '江苏省', '苏州': '江苏省', '南通': '江苏省', '连云港': '江苏省', '淮安': '江苏省', '盐城': '江苏省', '扬州': '江苏省', '镇江': '江苏省', '泰州': '江苏省', '宿迁': '江苏省',
+    '浙江': '浙江省', '杭州': '浙江省', '宁波': '浙江省', '温州': '浙江省', '嘉兴': '浙江省', '湖州': '浙江省', '绍兴': '浙江省', '金华': '浙江省', '衢州': '浙江省', '舟山': '浙江省', '台州': '浙江省', '丽水': '浙江省',
+    '安徽': '安徽省', '合肥': '安徽省', '芜湖': '安徽省', '蚌埠': '安徽省', '淮南': '安徽省', '马鞍山': '安徽省', '淮北': '安徽省', '铜陵': '安徽省', '安庆': '安徽省', '黄山': '安徽省', '滁州': '安徽省', '阜阳': '安徽省', '宿州': '安徽省', '六安': '安徽省', '亳州': '安徽省', '池州': '安徽省', '宣城': '安徽省',
+    '福建': '福建省', '福州': '福建省', '厦门': '福建省', '莆田': '福建省', '三明': '福建省', '泉州': '福建省', '漳州': '福建省', '南平': '福建省', '龙岩': '福建省', '宁德': '福建省',
+    '江西': '江西省', '南昌': '江西省', '景德镇': '江西省', '萍乡': '江西省', '九江': '江西省', '新余': '江西省', '鹰潭': '江西省', '赣州': '江西省', '吉安': '江西省', '宜春': '江西省', '抚州': '江西省', '上饶': '江西省',
+    '山东': '山东省', '济南': '山东省', '青岛': '山东省', '淄博': '山东省', '枣庄': '山东省', '东营': '山东省', '烟台': '山东省', '潍坊': '山东省', '济宁': '山东省', '泰安': '山东省', '威海': '山东省', '日照': '山东省', '临沂': '山东省', '德州': '山东省', '聊城': '山东省', '滨州': '山东省', '菏泽': '山东省',
+    '河南': '河南省', '郑州': '河南省', '开封': '河南省', '洛阳': '河南省', '平顶山': '河南省', '安阳': '河南省', '鹤壁': '河南省', '新乡': '河南省', '焦作': '河南省', '濮阳': '河南省', '许昌': '河南省', '漯河': '河南省', '三门峡': '河南省', '南阳': '河南省', '商丘': '河南省', '信阳': '河南省', '周口': '河南省', '驻马店': '河南省',
+    '湖北': '湖北省', '武汉': '湖北省', '黄石': '湖北省', '十堰': '湖北省', '宜昌': '湖北省', '襄阳': '湖北省', '鄂州': '湖北省', '荆门': '湖北省', '孝感': '湖北省', '荆州': '湖北省', '黄冈': '湖北省', '咸宁': '湖北省', '随州': '湖北省',
+    '湖南': '湖南省', '长沙': '湖南省', '株洲': '湖南省', '湘潭': '湖南省', '衡阳': '湖南省', '邵阳': '湖南省', '岳阳': '湖南省', '常德': '湖南省', '张家界': '湖南省', '益阳': '湖南省', '郴州': '湖南省', '永州': '湖南省', '怀化': '湖南省', '娄底': '湖南省', '湘西': '湖南省',
+    '广东': '广东省', '广州': '广东省', '韶关': '广东省', '深圳': '广东省', '珠海': '广东省', '汕头': '广东省', '佛山': '广东省', '江门': '广东省', '湛江': '广东省', '茂名': '广东省', '肇庆': '广东省', '惠州': '广东省', '梅州': '广东省', '汕尾': '广东省', '河源': '广东省', '阳江': '广东省', '清远': '广东省', '东莞': '广东省', '中山': '广东省', '潮州': '广东省', '揭阳': '广东省', '云浮': '广东省',
+    '广西': '广西壮族自治区', '南宁': '广西壮族自治区', '柳州': '广西壮族自治区', '桂林': '广西壮族自治区', '梧州': '广西壮族自治区', '北海': '广西壮族自治区', '防城港': '广西壮族自治区', '钦州': '广西壮族自治区', '贵港': '广西壮族自治区', '玉林': '广西壮族自治区', '百色': '广西壮族自治区', '贺州': '广西壮族自治区', '河池': '广西壮族自治区', '来宾': '广西壮族自治区', '崇左': '广西壮族自治区',
+    '海南': '海南省', '海口': '海南省', '三亚': '海南省', '三沙': '海南省', '儋州': '海南省',
+    '四川': '四川省', '成都': '四川省', '自贡': '四川省', '攀枝花': '四川省', '泸州': '四川省', '德阳': '四川省', '绵阳': '四川省', '广元': '四川省', '遂宁': '四川省', '内江': '四川省', '乐山': '四川省', '南充': '四川省', '眉山': '四川省', '宜宾': '四川省', '广安': '四川省', '达州': '四川省', '雅安': '四川省', '巴中': '四川省', '资阳': '四川省', '阿坝': '四川省', '甘孜': '四川省', '凉山': '四川省',
+    '贵州': '贵州省', '贵阳': '贵州省', '六盘水': '贵州省', '遵义': '贵州省', '安顺': '贵州省', '毕节': '贵州省', '铜仁': '贵州省', '黔西南': '贵州省', '黔东南': '贵州省', '黔南': '贵州省',
+    '云南': '云南省', '昆明': '云南省', '曲靖': '云南省', '玉溪': '云南省', '保山': '云南省', '昭通': '云南省', '丽江': '云南省', '普洱': '云南省', '临沧': '云南省', '楚雄': '云南省', '红河': '云南省', '文山': '云南省', '西双版纳': '云南省', '大理': '云南省', '德宏': '云南省', '怒江': '云南省', '迪庆': '云南省',
+    '西藏': '西藏自治区', '拉萨': '西藏自治区', '日喀则': '西藏自治区', '昌都': '西藏自治区', '林芝': '西藏自治区', '山南': '西藏自治区', '那曲': '西藏自治区',
+    '陕西': '陕西省', '西安': '陕西省', '铜川': '陕西省', '宝鸡': '陕西省', '咸阳': '陕西省', '渭南': '陕西省', '延安': '陕西省', '汉中': '陕西省', '榆林': '陕西省', '安康': '陕西省', '商洛': '陕西省',
+    '甘肃': '甘肃省', '兰州': '甘肃省', '嘉峪关': '甘肃省', '金昌': '甘肃省', '白银': '甘肃省', '天水': '甘肃省', '武威': '甘肃省', '张掖': '甘肃省', '平凉': '甘肃省', '酒泉': '甘肃省', '庆阳': '甘肃省', '定西': '甘肃省', '陇南': '甘肃省', '临夏': '甘肃省', '甘南': '甘肃省',
+    '青海': '青海省', '西宁': '青海省', '海东': '青海省', '海北': '青海省', '黄南': '青海省', '海南州': '青海省', '果洛': '青海省', '玉树': '青海省', '海西': '青海省',
+    '宁夏': '宁夏回族自治区', '银川': '宁夏回族自治区', '石嘴山': '宁夏回族自治区', '吴忠': '宁夏回族自治区', '固原': '宁夏回族自治区', '中卫': '宁夏回族自治区',
+    '新疆': '新疆维吾尔自治区', '乌鲁木齐': '新疆维吾尔自治区', '克拉玛依': '新疆维吾尔自治区', '吐鲁番': '新疆维吾尔自治区', '哈密': '新疆维吾尔自治区', '昌吉': '新疆维吾尔自治区', '博尔塔拉': '新疆维吾尔自治区', '巴音郭楞': '新疆维吾尔自治区', '阿克苏': '新疆维吾尔自治区', '克孜勒苏': '新疆维吾尔自治区', '喀什': '新疆维吾尔自治区', '和田': '新疆维吾尔自治区', '伊犁': '新疆维吾尔自治区',
+    '香港': '香港特别行政区', '澳门': '澳门特别行政区',
+    '台湾': '台湾省', '台北': '台湾省', '新北': '台湾省', '高雄': '台湾省', '台中': '台湾省', '台南': '台湾省'
+};
+
+// 把投稿里的城市或省份名称解析成省级行政区名，用于地图定位
+function getProvinceForCity(city) {
+    const value = (city || '').trim();
+    if (!value) return '';
+
+    if (CITY_PROVINCE_MAP[value]) return CITY_PROVINCE_MAP[value];
+
+    const province = (window.CHINA_PROVINCES || []).find((item) =>
+        item.name === value || item.short === value
+    );
+    return province ? province.name : '';
+}
+
+async function getUserPostProvinces() {
+    const token = getToken();
+    if (!token) return new Set();
+
+    try {
+        const res = await fetch(`${API_BASE}/api/my-contributions`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return new Set();
+
+        const posts = await res.json();
+        if (!Array.isArray(posts)) return new Set();
+
+        return new Set(
+            posts
+                .map((post) => getProvinceForCity(post.city))
+                .filter(Boolean)
+        );
+    } catch (err) {
+        console.warn('获取投稿省份失败', err);
+        return new Set();
+    }
+}
+
 // DOM
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -57,6 +129,8 @@ const els = {
     communityList: $('community-list'),
     communityRefresh: $('community-refresh'),
     meUserCard: $('me-user-card'),
+    meMap: $('me-map'),
+    chinaMap: $('china-map'),
     meTabs: document.querySelectorAll('.me-tab'),
     meContent: $('me-content'),
     meLogout: $('me-logout'),
@@ -74,7 +148,8 @@ const els = {
 let currentMethod = 'bm25';
 let currentCity = '';
 let currentView = 'home';        // 当前激活的页面视图
-let currentMeSection = 'history'; // 我的页当前分区
+let currentMeSection = null; // 我的页当前分区（null 时显示中国地图）
+let currentMeProvince = '';  // 从地图点击进入时筛选的投稿省份
 let abortController = null;
 let typingTimer = null;
 let toastTimer = null;
@@ -256,9 +331,12 @@ function bindEvents() {
     // 我的页分区切换
     els.meTabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            currentMeSection = tab.dataset.section || 'history';
-            els.meTabs.forEach(t => t.classList.toggle('active', t === tab));
-            renderMeSection();
+            const section = tab.dataset.section || 'history';
+            // 通过底部 tab 切换时取消地图省份筛选，避免残留到后面的“我的投稿”视图
+            currentMeProvince = '';
+            // 再次点击当前分区时取消选择，回到中国地图
+            currentMeSection = currentMeSection === section ? null : section;
+            showMeSection();
         });
     });
     els.meLogout.addEventListener('click', logoutUser);
@@ -1038,7 +1116,57 @@ async function renderMeView() {
         const loginBtn = document.getElementById('me-login-btn');
         if (loginBtn) loginBtn.addEventListener('click', () => openAuthModal());
     }
-    renderMeSection();
+    showMeSection();
+}
+
+async function showMeSection() {
+    const hasSection = currentMeSection !== null;
+    els.meMap.hidden = hasSection;
+    els.meContent.hidden = !hasSection;
+    els.meTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.section === currentMeSection));
+
+    if (hasSection) {
+        await renderMeSection();
+    } else {
+        currentMeProvince = '';
+        await renderChinaMap();
+    }
+}
+
+async function renderChinaMap() {
+    const svg = els.chinaMap;
+    if (!svg || !window.CHINA_PROVINCES || !window.CHINA_PROVINCES.length) return;
+
+    const postProvinces = await getUserPostProvinces();
+    const paths = window.CHINA_PROVINCES.map((province) => {
+        const hasUserPost = postProvinces.has(province.name);
+        const classes = [
+            'map-province',
+            province.covered ? 'covered' : '',
+            hasUserPost ? 'has-user-post' : ''
+        ].filter(Boolean).join(' ');
+        return `<path class="${classes}" d="${province.path}" data-name="${escapeHtml(province.name)}"></path>`;
+    }).join('');
+
+    svg.innerHTML = `${paths}<text class="china-map-tooltip" x="500" y="80" text-anchor="middle"></text>`;
+
+    const tooltip = svg.querySelector('.china-map-tooltip');
+    svg.querySelectorAll('path.map-province').forEach((path) => {
+        path.addEventListener('mouseenter', () => {
+            tooltip.textContent = path.dataset.name || '';
+        });
+        path.addEventListener('mouseleave', () => {
+            tooltip.textContent = '';
+        });
+        path.addEventListener('click', () => {
+            const provinceName = path.dataset.name || '';
+            if (!path.classList.contains('has-user-post') || !provinceName) return;
+
+            currentMeProvince = provinceName;
+            currentMeSection = 'posts';
+            showMeSection();
+        });
+    });
 }
 
 function renderMeSection() {
@@ -1051,7 +1179,7 @@ function renderMeSection() {
             els.meContent.innerHTML = '<div class="home-empty">登录后即可查看自己的投稿。</div>';
             return;
         }
-        loadUserHomePosts(els.meContent);
+        loadUserHomePosts(els.meContent, currentMeProvince);
     }
 }
 
@@ -1278,7 +1406,7 @@ async function openCommunityPostDetail(postId, username = '', sourceTitle = '', 
     }
 }
 
-async function loadUserHomePosts(container = els.meContent) {
+async function loadUserHomePosts(container = els.meContent, province = '') {
     const token = getToken();
     if (!token) return;
     if (!container) return;
@@ -1295,12 +1423,34 @@ async function loadUserHomePosts(container = els.meContent) {
             throw new Error('获取帖子列表失败');
         }
         const posts = await res.json();
-        if (!posts.length) {
-            container.innerHTML = '<div class="home-empty">还没有发布过心得，快去上传经验吧。</div>';
+
+        const listPosts = Array.isArray(posts) ? posts : [];
+        const filtered = province
+            ? listPosts.filter((post) => getProvinceForCity(post.city) === province)
+            : listPosts;
+
+        const backButton = province
+            ? `<button type="button" class="map-back-link" data-action="back-to-map">← 返回地图</button>`
+            : '';
+        const listHeader = province
+            ? `<div class="province-posts-head">${escapeHtml(province)}的投稿</div>`
+            : '';
+
+        if (!filtered.length) {
+            const emptyText = province
+                ? `还没有发布过${escapeHtml(province)}的旅游经验。`
+                : '还没有发布过心得，快去上传经验吧。';
+            container.innerHTML = `
+                ${backButton}${listHeader}
+                <div class="home-empty">${emptyText}</div>
+            `;
+            bindPostsBackToMap(container);
             return;
         }
 
-        container.innerHTML = posts.map((post) => `
+        container.innerHTML = `
+            ${backButton}${listHeader}
+            ${filtered.map((post) => `
             <article class="user-post-card" data-post-id="${escapeHtml(post.id || '')}">
                 <div class="post-topline">
                     <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
@@ -1313,22 +1463,35 @@ async function loadUserHomePosts(container = els.meContent) {
                     <span>${escapeHtml(post.username || '用户')}</span>
                 </div>
             </article>
-        `).join('');
+            `).join('')}
+        `;
 
         container.querySelectorAll('.user-post-card').forEach((card) => {
             card.addEventListener('click', async () => {
                 const postId = card.dataset.postId;
                 if (!postId) return;
-                await openUserPostDetail(postId, container);
+                await openUserPostDetail(postId, container, province);
             });
         });
+
+        bindPostsBackToMap(container);
     } catch (err) {
         container.innerHTML = '<div class="home-empty">帖子加载失败，请稍后重试。</div>';
         console.warn(err);
     }
 }
 
-async function openUserPostDetail(postId, container = els.meContent) {
+function bindPostsBackToMap(container) {
+    const backBtn = container.querySelector('[data-action="back-to-map"]');
+    if (!backBtn) return;
+    backBtn.addEventListener('click', () => {
+        currentMeSection = null;
+        currentMeProvince = '';
+        showMeSection();
+    });
+}
+
+async function openUserPostDetail(postId, container = els.meContent, province = '') {
     const token = getToken();
     if (!token) return;
     if (!container) return;
@@ -1347,7 +1510,7 @@ async function openUserPostDetail(postId, container = els.meContent) {
         const post = await res.json();
         container.innerHTML = `
             <div class="user-post-detail">
-                <button type="button" class="back-link" data-action="back-to-list">← 返回我的投稿</button>
+                <button type="button" class="map-back-link" data-action="back-to-list">← 返回${province ? escapeHtml(province) + '投稿' : '我的投稿'}</button>
                 <div class="post-detail-header">
                     <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
                     <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
@@ -1363,7 +1526,7 @@ async function openUserPostDetail(postId, container = els.meContent) {
 
         const backBtn = container.querySelector('[data-action="back-to-list"]');
         if (backBtn) {
-            backBtn.addEventListener('click', () => loadUserHomePosts(container));
+            backBtn.addEventListener('click', () => loadUserHomePosts(container, province));
         }
 
         const deleteBtn = container.querySelector('[data-action="delete-post"]');
@@ -1380,7 +1543,7 @@ async function openUserPostDetail(postId, container = els.meContent) {
                     return;
                 }
                 showToast('帖子已删除', 'ok');
-                await loadUserHomePosts(container);
+                await loadUserHomePosts(container, province);
             });
         }
     } catch (err) {
