@@ -6,8 +6,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GEOJSON_PATH = ROOT / "china_provinces.geojson"
-OUTPUT_PATH = ROOT / "frontend" / "china-map.js"
+TOOL_DIR = Path(__file__).resolve().parent
+GEOJSON_PATH = TOOL_DIR / "data" / "china_provinces.geojson"
+OUTPUT_PATH = ROOT / "frontend" / "generated" / "china-map.js"
 
 LAT_MIN = 17.5
 LAT_MAX = 53.563269
