@@ -4,7 +4,7 @@
 - 方案A：jieba 分词 + 关键词匹配 + 倒排索引
 - 方案B：BM25 检索（rank-bm25）
 - 方案C：文本向量相似度检索（sentence-transformers 稠密向量，增量式快照持久化）
-- 方案D：BM25 + 文本向量的混合检索（加权融合）
+- 方案D：BM25 + 文本向量的混合检索（RRF 倒数排名融合 + 召回池/可选重排）
 
 模块级维护一个 KnowledgeBase 单例（knowledge_base），并保留同名薄封装函数
 作为稳定的公开 API；新增/测试时也可直接使用单例对象。
@@ -13,6 +13,11 @@
 新增知识条目入库后，下一次向量/混合检索只会对新条目做编码，不再全库重建。
 删除快照目录、更换 EMBEDDING_MODEL_NAME 或提升 VECTOR_INDEX_VERSION
 均可强制全量重建。
+
+混合检索（方案D）：
+- RRF（倒数排名融合）替代 min-max 加权求和，对分数分布不敏感
+- 城市硬过滤：单城市问题只在目标城市条目上检索；多城市/对比类问题自动回退全库
+- 召回池 + 可选 CrossEncoder 重排（RERANKER_MODEL_NAME 为空或加载失败时自动降级）
 """
 
 import json
@@ -25,7 +30,13 @@ import numpy as np
 from rank_bm25 import BM25Okapi
 
 from . import config
-from .city_detector import CITY_TAGS, COVERED_CITIES, _load_city_metadata, get_all_city_names
+from .city_detector import (
+    CITY_ALIASES,
+    CITY_TAGS,
+    COVERED_CITIES,
+    _load_city_metadata,
+    get_all_city_names,
+)
 
 # 知识库与向量快照目录（类内按使用时机读取模块全局，便于测试时替换）
 KNOWLEDGE_DIR = config.KNOWLEDGE_DIR
@@ -34,6 +45,8 @@ VECTOR_INDEX_VERSION = config.VECTOR_INDEX_VERSION
 
 _VECTOR_MODEL_NAME = config.EMBEDDING_MODEL_NAME
 _VECTOR_QUERY_PREFIX = config.VECTOR_QUERY_PREFIX
+_RERANKER_MODEL_NAME = config.RERANKER_MODEL_NAME
+_HYBRID_RECALL_K = config.HYBRID_RECALL_K
 
 _STOP_WORDS = {
     "的", "了", "在", "是", "我", "有", "和", "就", "不", "人",
@@ -60,6 +73,9 @@ class KnowledgeBase:
         self._vector_city_ids: dict[str, list[str]] | None = None
         self._vector_status: str = "not_loaded"  # not_loaded / ready / unavailable
         self._vector_lock = threading.Lock()
+        # 重排模型缓存（可选能力）
+        self._reranker = None
+        self._reranker_status: str = "not_loaded"  # not_loaded / ready / unavailable
         # jieba 分词词典初始化标志
         self._jieba_initialized: bool = False
 
@@ -302,28 +318,13 @@ class KnowledgeBase:
         # BM25 评分
         bm25_scores = self._bm25_index.get_scores(question_tokens)
 
-        # 构建带分数的条目列表（城市优先加权）
-        scored_entries = []
-        for idx, entry in enumerate(all_entries):
-            score = float(bm25_scores[idx])
-            # 城市优先：若识别到城市且条目城市匹配，加权
-            if city and entry.get("city") == city:
-                score *= city_boost
-            # 若有城市且条目城市不匹配，降权
-            if city and entry.get("city") != city:
-                score *= 0.5
-            scored_entries.append((score, entry))
+        # 城市硬过滤（多城市/对比类问题自动回退全库 + 加权）
+        scope, hard_filtered = self._scope_candidates(all_entries, city, question)
+        doc_ids = scope if scope is not None else list(range(len(all_entries)))
 
-        # 按分数降序排序
-        scored_entries.sort(key=lambda x: x[0], reverse=True)
-
-        # 返回 top_k
-        results = []
-        for score, entry in scored_entries[:top_k]:
-            result = dict(entry)
-            result["score"] = round(score, 4)
-            results.append(result)
-        return results
+        return self._rank_scored(
+            all_entries, doc_ids, bm25_scores, top_k, city, city_boost, hard_filtered
+        )
 
     # ============================================================
     # 向量模型与快照持久化
@@ -626,7 +627,7 @@ class KnowledgeBase:
         top_k: int = 5,
         city_boost: float = 1.5,
     ) -> list[dict]:
-        """文本向量相似度检索（稠密向量余弦相似度）
+        """文本向量相似度检索（稠密向量余弦相似度 + 城市硬过滤）
 
         向量模型不可用时返回空列表。
         """
@@ -643,38 +644,135 @@ class KnowledgeBase:
             return []
 
         sims = corpus @ q_vec
-        scored_entries = self._apply_city_boost(
-            [(float(sims[idx]), entry) for idx, entry in enumerate(all_entries)],
-            city,
-            city_boost,
+        scope, hard_filtered = self._scope_candidates(all_entries, city, question)
+        doc_ids = scope if scope is not None else list(range(len(all_entries)))
+        return self._rank_scored(
+            all_entries, doc_ids, sims, top_k, city, city_boost, hard_filtered
         )
-        scored_entries.sort(key=lambda x: x[0], reverse=True)
+
+    # ============================================================
+    # 融合与重排工具（方案 D 使用）
+    # ============================================================
+
+    def _rank_scored(
+        self,
+        all_entries: list[dict],
+        doc_ids: list[int],
+        scores,
+        top_k: int,
+        city: str | None,
+        city_boost: float,
+        hard_filtered: bool,
+    ) -> list[dict]:
+        """对候选 doc_ids 按分数降序取 top_k；未硬过滤且给定城市时应用城市加权"""
+        scored = []
+        for i in doc_ids:
+            s = float(scores[i])
+            if not hard_filtered and city:
+                s *= city_boost if all_entries[i].get("city") == city else 0.5
+            scored.append((i, s))
+        scored.sort(key=lambda x: x[1], reverse=True)
 
         results = []
-        for score, entry in scored_entries[:top_k]:
-            result = dict(entry)
-            result["score"] = round(score, 4)
-            results.append(result)
+        for i, s in scored[:top_k]:
+            entry = dict(all_entries[i])
+            entry["score"] = round(s, 4)
+            results.append(entry)
         return results
 
     @staticmethod
-    def _apply_city_boost(
-        scored: list[tuple[float, dict]],
-        city: str | None,
-        city_boost: float,
-    ) -> list[tuple[float, dict]]:
-        """城市加权：匹配城市加权，其他城市降权"""
-        boosted = []
-        for score, entry in scored:
-            if city and entry.get("city") == city:
-                score *= city_boost
-            elif city:
-                score *= 0.5
-            boosted.append((score, entry))
-        return boosted
+    def _is_multi_city_question(question: str) -> bool:
+        """判断是否为跨城市/对比类问题（此时不应做城市硬过滤）"""
+        _load_city_metadata()
+        if any(
+            kw in question for kw in ("对比", "比较", "不同", "区别", "哪个更", "还是")
+        ):
+            return True
+        hits, seen = 0, set()
+        names = sorted(set(COVERED_CITIES) | set(CITY_ALIASES), key=len, reverse=True)
+        for name in names:
+            if name and name in question:
+                canonical = CITY_ALIASES.get(name, name)
+                if canonical in seen:
+                    continue
+                seen.add(canonical)
+                hits += 1
+        return hits >= 2
+
+    def _scope_candidates(
+        self, entries: list[dict], city: str | None, question: str
+    ) -> tuple[list[int] | None, bool]:
+        """城市硬过滤：返回候选条目索引列表；返回 (None, False) 表示不做硬过滤。
+
+        规则：
+        - 无 city、city 不在覆盖城市、该城市无条目 → 全库（不做硬过滤）
+        - 多城市/对比类问题 → 全库（硬过滤会误伤跨城对比）
+        - 单城市问题 → 仅该城市条目的索引
+        """
+        if not city or city not in COVERED_CITIES:
+            return None, False
+        if self._is_multi_city_question(question):
+            return None, False
+        idxs = [i for i, e in enumerate(entries) if e.get("city") == city]
+        if not idxs:
+            return None, False
+        return idxs, True
+
+    @staticmethod
+    def _rrf_fuse_indices(
+        ranked_a: list[int], ranked_b: list[int], k: int = 60
+    ) -> dict[int, float]:
+        """RRF 倒数排名融合：按排名计分（Σ 1/(k+rank)），对分数分布不敏感。
+
+        两个通道各给一个按分数降序排列的文档索引列表，返回 索引 -> RRF 分数。
+        """
+        scores: dict[int, float] = {}
+        for rank, idx in enumerate(ranked_a):
+            scores[idx] = scores.get(idx, 0.0) + 1.0 / (k + rank + 1)
+        for rank, idx in enumerate(ranked_b):
+            scores[idx] = scores.get(idx, 0.0) + 1.0 / (k + rank + 1)
+        return scores
+
+    @property
+    def rerank_status(self) -> str:
+        """重排模型可用状态：not_loaded / ready / unavailable"""
+        return self._reranker_status
+
+    def _load_reranker(self):
+        """加载 CrossEncoder 重排模型（可选能力）。
+
+        失败返回 None（混合检索自动退化为纯 RRF 排序）；
+        测试可替换本方法注入假模型。
+        """
+        if self._reranker is not None:
+            return self._reranker
+        if not _RERANKER_MODEL_NAME:
+            self._reranker_status = "unavailable"
+            return None
+        try:
+            from sentence_transformers import CrossEncoder
+        except ImportError:
+            self._reranker_status = "unavailable"
+            return None
+        try:
+            try:
+                self._reranker = CrossEncoder(
+                    _RERANKER_MODEL_NAME, local_files_only=True
+                )
+            except Exception:
+                print("[INFO] 本地缓存未命中，尝试自动下载重排模型...")
+                self._reranker = CrossEncoder(_RERANKER_MODEL_NAME)
+            self._reranker_status = "ready"
+            return self._reranker
+        except Exception as e:
+            self._reranker_status = "unavailable"
+            print(
+                f"[WARNING] 重排模型加载失败（可选能力，混合检索降级为 RRF 排序）：{e}"
+            )
+            return None
 
     # ============================================================
-    # 方案 D：BM25 + 文本向量混合检索（加权融合）
+    # 方案 D：BM25 + 向量混合检索（RRF 融合 + 召回池/重排）
     # ============================================================
 
     def search_hybrid(
@@ -682,56 +780,78 @@ class KnowledgeBase:
         question: str,
         city: str | None = None,
         top_k: int = 5,
-        w_bm25: float = 0.5,
-        w_vector: float = 0.5,
+        recall_k: int | None = None,
+        rerank: bool = True,
         city_boost: float = 1.5,
     ) -> list[dict]:
         """BM25 + 文本向量混合检索。
 
-        将 BM25 分数归一化到 [0,1] 后与向量余弦相似度加权求和；
-        向量模型不可用时自动降级为纯 BM25。
+        流程：
+        1. 城市硬过滤（多城市/对比类问题自动回退全库）
+        2. BM25 与向量各对候选集打分，RRF 倒数排名融合
+        3. 取 RRF 前 recall_k 条为召回池，可选 CrossEncoder 精排后返回 top_k
+
+        向量通道不可用时自动降级为纯 BM25（保留城市逻辑）。
         """
         self._ensure_jieba()
         all_entries = self.load()
         if not all_entries:
             return []
+        if recall_k is None:
+            recall_k = _HYBRID_RECALL_K
 
+        scope, hard_filtered = self._scope_candidates(all_entries, city, question)
+        doc_ids = scope if scope is not None else list(range(len(all_entries)))
+
+        # BM25 通道
         self._ensure_bm25(all_entries)
         question_tokens = list(jieba.cut(question))
         bm25_scores = self._bm25_index.get_scores(question_tokens)
 
+        # 向量通道（不可用 → 降级为纯 BM25 排序）
+        vec_scores = None
         corpus = self._get_corpus_for(all_entries)
-        if corpus is None:
-            print("[INFO] 向量模型不可用，混合检索降级为 BM25")
-            return self.search_bm25(question, city=city, top_k=top_k, city_boost=city_boost)
+        if corpus is not None:
+            q_vec = self._embed_query(question)
+            if q_vec is not None:
+                vec_scores = corpus @ q_vec
+        if vec_scores is None:
+            print("[INFO] 向量通道不可用，混合检索降级为 BM25")
+            return self._rank_scored(
+                all_entries, doc_ids, bm25_scores, top_k, city, city_boost, hard_filtered
+            )
 
-        q_vec = self._embed_query(question)
-        if q_vec is None:
-            return self.search_bm25(question, city=city, top_k=top_k, city_boost=city_boost)
-
-        # BM25 分数 min-max 归一化到 [0,1]
-        bm25_min = float(np.min(bm25_scores))
-        bm25_max = float(np.max(bm25_scores))
-        if bm25_max > bm25_min:
-            bm25_norm = (bm25_scores - bm25_min) / (bm25_max - bm25_min)
-        else:
-            bm25_norm = np.zeros_like(bm25_scores)
-
-        vec_scores = corpus @ q_vec
-        fused = w_bm25 * bm25_norm + w_vector * vec_scores
-
-        scored_entries = self._apply_city_boost(
-            [(float(fused[idx]), entry) for idx, entry in enumerate(all_entries)],
-            city,
-            city_boost,
+        # RRF 融合（仅统计候选集内的文档）
+        rrf_scores = self._rrf_fuse_indices(
+            sorted(doc_ids, key=lambda i: float(bm25_scores[i]), reverse=True),
+            sorted(doc_ids, key=lambda i: float(vec_scores[i]), reverse=True),
         )
-        scored_entries.sort(key=lambda x: x[0], reverse=True)
+
+        # 召回池 → 可选精排
+        pool = sorted(doc_ids, key=lambda i: rrf_scores[i], reverse=True)[:recall_k]
+        reranker = self._load_reranker() if rerank else None
+        if reranker is not None:
+            pairs = [
+                (question, self._build_search_text(all_entries[i])) for i in pool
+            ]
+            try:
+                raw = reranker.predict(pairs)
+            except AttributeError:
+                raw = reranker.score(pairs)
+            rerank_scores = {idx: float(s) for idx, s in zip(pool, raw)}
+            final_rank = sorted(pool, key=lambda i: rerank_scores[i], reverse=True)[
+                :top_k
+            ]
+        else:
+            final_rank = pool[:top_k]
 
         results = []
-        for score, entry in scored_entries[:top_k]:
-            result = dict(entry)
-            result["score"] = round(score, 4)
-            results.append(result)
+        for i in final_rank:
+            entry = dict(all_entries[i])
+            entry["score"] = round(float(rrf_scores[i]), 4)
+            entry["bm25_score"] = round(float(bm25_scores[i]), 4)
+            entry["vector_score"] = round(float(vec_scores[i]), 4)
+            results.append(entry)
         return results
 
     # ============================================================
@@ -889,12 +1009,17 @@ def search_hybrid(
     question: str,
     city: str | None = None,
     top_k: int = 5,
-    w_bm25: float = 0.5,
-    w_vector: float = 0.5,
+    recall_k: int | None = None,
+    rerank: bool = True,
     city_boost: float = 1.5,
 ) -> list[dict]:
     return knowledge_base.search_hybrid(
-        question, city=city, top_k=top_k, w_bm25=w_bm25, w_vector=w_vector, city_boost=city_boost
+        question,
+        city=city,
+        top_k=top_k,
+        recall_k=recall_k,
+        rerank=rerank,
+        city_boost=city_boost,
     )
 
 
@@ -928,6 +1053,10 @@ def get_knowledge_page(
 
 def get_vector_status() -> str:
     return knowledge_base.vector_status
+
+
+def get_rerank_status() -> str:
+    return knowledge_base.rerank_status
 
 
 def invalidate_vector_cache() -> None:

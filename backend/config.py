@@ -32,6 +32,13 @@ VECTOR_INDEX_DIR = DATA_DIR / "vector_index"
 # 向量快照格式版本：更换向量模型或跳版本可强制全量重建
 VECTOR_INDEX_VERSION = 1
 
+# ---------------- 混合检索（M1：RRF + 召回池 + 重排） ----------------
+# 每条通道的召回池大小：先各自取 top-recall_k，融合后精排取 top_k
+HYBRID_RECALL_K = 50
+# CrossEncoder 重排模型（可选能力）。下载体积较大（约 1.1GB），
+# 设为空字符串可禁用重排，混合检索退化为纯 RRF 排序
+RERANKER_MODEL_NAME = os.getenv("RERANKER_MODEL_NAME", "BAAI/bge-reranker-base")
+
 # ---------------- 认证 ----------------
 # 演示用内置密钥；生产环境请通过环境变量 SECRET_KEY 覆盖
 SECRET_KEY = os.getenv("SECRET_KEY", "travel-qa-demo-secret-key-v1")

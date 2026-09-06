@@ -3,7 +3,13 @@
 from fastapi import APIRouter
 
 from ..city_detector import COVERED_CITIES, _load_city_metadata
-from ..retriever import get_city_info, get_knowledge_page, get_vector_status, load_knowledge_base
+from ..retriever import (
+    get_city_info,
+    get_knowledge_page,
+    get_rerank_status,
+    get_vector_status,
+    load_knowledge_base,
+)
 from ..schemas import CityInfo, KnowledgePage
 
 router = APIRouter(tags=["知识库"])
@@ -20,6 +26,7 @@ async def health():
         "knowledge_count": len(entries),
         "covered_cities": COVERED_CITIES,
         "vector_retrieval": get_vector_status(),
+        "rerank_retrieval": get_rerank_status(),
     }
 
 
