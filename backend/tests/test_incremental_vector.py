@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from backend import city_detector, config, contribution_store, retriever
+from backend import city_detector, config, contribution_store, knowledge_db, retriever
 
 
 class FakeModel:
@@ -87,6 +87,7 @@ class IncrementalVectorIndexTests(unittest.TestCase):
             "contribution_store.KNOWLEDGE_DIR": contribution_store.KNOWLEDGE_DIR,
             "contribution_store.DB_PATH": contribution_store.DB_PATH,
             "city_detector.KNOWLEDGE_DIR": city_detector.KNOWLEDGE_DIR,
+            "knowledge_db.KNOWLEDGE_DB_PATH": knowledge_db.KNOWLEDGE_DB_PATH,
             "config.DEDUP_ENABLED": config.DEDUP_ENABLED,
         }
 
@@ -96,6 +97,7 @@ class IncrementalVectorIndexTests(unittest.TestCase):
         contribution_store.KNOWLEDGE_DIR = self.kb_dir
         contribution_store.DB_PATH = self.tmp / "db" / "contributions.db"
         city_detector.KNOWLEDGE_DIR = self.kb_dir
+        knowledge_db.KNOWLEDGE_DB_PATH = self.tmp / "db" / "knowledge.db"
         # 本测试的追加条目共用同一份默认内容，恰是去重要拦的重复场景；
         # 这里只验证写入并发与向量增量，显式关闭去重
         config.DEDUP_ENABLED = False
@@ -120,6 +122,7 @@ class IncrementalVectorIndexTests(unittest.TestCase):
                 "kb": retriever.knowledge_base,
                 "contribution_store": contribution_store,
                 "city_detector": city_detector,
+                "knowledge_db": knowledge_db,
                 "config": config,
             }[target]
             setattr(module, attr, value)
@@ -218,7 +221,16 @@ class IncrementalVectorIndexTests(unittest.TestCase):
         self.kb.init_vector_index(entries)
         calls_before = len(self.fake.encode_calls)
 
-        self._write_city("z市", [_meta("z市"), _entry("z市", "z-1", "Z1")])
+        # 新城市走真实入库路径（M3-B：SQLite 写入，append 内部已刷新缓存）
+        contribution_store.append_entry_to_knowledge(
+            {
+                "city": "z市",
+                "title": "Z1",
+                "content": "新城市入库测试内容，长度足够长以便通过校验。",
+                "user_id": "u1",
+                "username": "tester",
+            }
+        )
         self._reset_caches()
 
         entries = retriever.load_knowledge_base()
@@ -245,7 +257,7 @@ class IncrementalVectorIndexTests(unittest.TestCase):
             retriever.VECTOR_INDEX_VERSION -= 1
 
     def test_06_concurrent_double_append_no_entry_loss(self):
-        """并发写入串行化：两次追加（跨进程文件锁）后文件里两条都在"""
+        """并发写入串行化：两次追加后两条都在（SQLite 事务，UNIQUE 冲突不丢）"""
         e1 = contribution_store.append_entry_to_knowledge(
             {
                 "city": "b市",
@@ -264,12 +276,32 @@ class IncrementalVectorIndexTests(unittest.TestCase):
                 "username": "tester",
             }
         )
-        with open(self.kb_dir / "b市.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-        ids = [it.get("id") for it in data if it.get("id") != "_meta"]
+        self.assertNotIn("skipped", e1)
+        self.assertNotIn("skipped", e2)
+        # 从 SQLite 读取验证两条都在
+        b_entries = [
+            e for e in retriever.load_knowledge_base() if e.get("city") == "b市"
+        ]
+        ids = [e["id"] for e in b_entries]
         self.assertIn(e1["id"], ids)
         self.assertIn(e2["id"], ids)
         self.assertEqual(len(ids), 3)  # b-1 + B2 + B3
+
+    def test_07_fts_bm25_search_from_sqlite(self):
+        """M3-B：BM25 走 SQLite FTS5 持久化索引（条目带 rid），零分条目不填充"""
+        results = self.kb.search_bm25("测试 旅游", top_k=5)
+        self.assertEqual(len(results), 3)  # a-1/a-2/b-1 全部命中
+        self.assertTrue(all(r["score"] > 0 for r in results))
+        self.assertTrue(all("rid" in r for r in results))
+
+        # 城市硬过滤 + FTS 通道
+        res_city = self.kb.search_bm25("测试 旅游", city="a市", top_k=5)
+        self.assertEqual(len(res_city), 2)
+        self.assertTrue(all(r["city"] == "a市" for r in res_city))
+
+        # 未命中查询 → 空结果而不是零分填充
+        res_none = self.kb.search_bm25("不存在的关键词", top_k=5)
+        self.assertEqual(res_none, [])
 
 
 if __name__ == "__main__":

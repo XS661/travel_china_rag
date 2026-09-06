@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backend import city_detector, contribution_store, retriever
+from backend import city_detector, contribution_store, knowledge_db, retriever
 from backend.contribution_store import (
     _slugify_city,
     find_similar_entry,
@@ -126,10 +126,12 @@ class ReviewDedupIntegrationTests(unittest.TestCase):
             "retriever.KNOWLEDGE_DIR": retriever.KNOWLEDGE_DIR,
             "city_detector.KNOWLEDGE_DIR": city_detector.KNOWLEDGE_DIR,
             "contribution_store.KNOWLEDGE_DIR": contribution_store.KNOWLEDGE_DIR,
+            "knowledge_db.KNOWLEDGE_DB_PATH": knowledge_db.KNOWLEDGE_DB_PATH,
         }
         retriever.KNOWLEDGE_DIR = self.kb_dir
         city_detector.KNOWLEDGE_DIR = self.kb_dir
         contribution_store.KNOWLEDGE_DIR = self.kb_dir
+        knowledge_db.KNOWLEDGE_DB_PATH = self.tmp / "data" / "knowledge.db"
 
         # 写一条已有知识入库
         entry = _entry(
@@ -147,6 +149,7 @@ class ReviewDedupIntegrationTests(unittest.TestCase):
                 "retriever": retriever,
                 "city_detector": city_detector,
                 "contribution_store": contribution_store,
+                "knowledge_db": knowledge_db,
             }[target]
             setattr(mod, attr, value)
         retriever.knowledge_base.clear_knowledge_caches()

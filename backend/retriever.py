@@ -96,41 +96,57 @@ class KnowledgeBase:
     # ============================================================
 
     def load(self) -> list[dict]:
-        """加载全部知识库到内存，并缓存"""
+        """加载全部知识库到内存，并缓存。
+
+        读取顺序：SQLite（backend/data/knowledge.db，自举迁移）→ 失败时回退 JSON 扫描。
+        """
         if self._entries is not None:
             return self._entries
 
-        all_entries: list[dict] = []
-        if not KNOWLEDGE_DIR.exists():
-            print(f"[WARNING] 知识库目录不存在: {KNOWLEDGE_DIR}")
-            all_entries = []
-        else:
-            for json_file in sorted(KNOWLEDGE_DIR.glob("*.json")):
-                try:
-                    with open(json_file, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        if isinstance(data, list):
-                            # 过滤掉 _meta 元数据条目，不作为可检索的知识
-                            data = [
-                                e
-                                for e in data
-                                if isinstance(e, dict) and e.get("id") != "_meta"
-                            ]
-                            all_entries.extend(data)
-                        elif isinstance(data, dict):
-                            # 兼容 {_meta, items} 格式；普通单条对象仍可直接加载。
-                            items = data.get("items")
-                            if isinstance(items, list):
-                                all_entries.extend(
-                                    e for e in items if isinstance(e, dict)
-                                )
-                            elif data.get("id") != "_meta":
-                                all_entries.append(data)
-                except (json.JSONDecodeError, IOError) as e:
-                    print(f"[WARNING] 读取知识库文件失败 {json_file}: {e}")
+        all_entries: list[dict] | None = None
+        try:
+            from .knowledge_db import ensure_db, fetch_all_entries
+
+            ensure_db(KNOWLEDGE_DIR)
+            all_entries = fetch_all_entries()
+        except Exception as e:
+            print(f"[WARNING] SQLite 知识库读取失败，回退 JSON 扫描：{e}")
+        if all_entries is None:
+            all_entries = self._load_entries_from_json()
 
         self._entries = all_entries
         print(f"[INFO] 知识库加载完成：共 {len(all_entries)} 条记录")
+        return all_entries
+
+    def _load_entries_from_json(self) -> list[dict]:
+        """回退路径：从 knowledge/*.json 全量扫描加载（迁移前/自举失败时）"""
+        all_entries: list[dict] = []
+        if not KNOWLEDGE_DIR.exists():
+            print(f"[WARNING] 知识库目录不存在: {KNOWLEDGE_DIR}")
+            return []
+        for json_file in sorted(KNOWLEDGE_DIR.glob("*.json")):
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        # 过滤掉 _meta 元数据条目，不作为可检索的知识
+                        data = [
+                            e
+                            for e in data
+                            if isinstance(e, dict) and e.get("id") != "_meta"
+                        ]
+                        all_entries.extend(data)
+                    elif isinstance(data, dict):
+                        # 兼容 {_meta, items} 格式；普通单条对象仍可直接加载。
+                        items = data.get("items")
+                        if isinstance(items, list):
+                            all_entries.extend(
+                                e for e in items if isinstance(e, dict)
+                            )
+                        elif data.get("id") != "_meta":
+                            all_entries.append(data)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"[WARNING] 读取知识库文件失败 {json_file}: {e}")
         return all_entries
 
     def get_by_city(self) -> dict[str, list[dict]]:
@@ -191,10 +207,34 @@ class KnowledgeBase:
     # ============================================================
 
     def _ensure_bm25(self, entries: list[dict]) -> None:
-        """初始化 BM25 索引（若尚未初始化）"""
+        """初始化内存 BM25 索引（FTS5 不可用时的兜底路径）"""
         if self._bm25_corpus is None or self._bm25_index is None:
             self._bm25_corpus = self._tokenized_corpus(entries)
             self._bm25_index = BM25Okapi(self._bm25_corpus)
+
+    def _bm25_scores(self, all_entries: list[dict], question: str) -> list[float]:
+        """BM25 评分（返回与 all_entries 顺序对齐的分数列表）。
+
+        M3-B：条目带 rid（SQLite 来源）时优先使用持久化的 FTS5 bm25()，
+        无需每次启动重排分词建索引；回退到内存 BM25Okapi（JSON 回退模式、
+        内存构造条目的测试场景）。查询侧统一过滤中文停用词。
+        """
+        from .knowledge_db import STOPWORDS
+
+        question_tokens = [
+            t for t in jieba.cut(question) if t.strip() and t not in STOPWORDS
+        ]
+        rid_values = [e.get("rid") for e in all_entries]
+        if rid_values and all(r is not None for r in rid_values):
+            try:
+                from .knowledge_db import fts_bm25_scores
+
+                score_map = fts_bm25_scores(question_tokens)
+                return [score_map.get(rid, 0.0) for rid in rid_values]
+            except Exception as e:
+                print(f"[WARNING] FTS5 BM25 不可用，回退内存 BM25Okapi：{e}")
+        self._ensure_bm25(all_entries)
+        return list(self._bm25_index.get_scores(question_tokens))
 
     def _inverted_index(
         self, entries: list[dict], cache_key: str = "__all__"
@@ -309,22 +349,20 @@ class KnowledgeBase:
         if not all_entries:
             return []
 
-        # 初始化 BM25（全库）
-        self._ensure_bm25(all_entries)
-
-        # 对问题分词
-        question_tokens = list(jieba.cut(question))
-
-        # BM25 评分
-        bm25_scores = self._bm25_index.get_scores(question_tokens)
+        # BM25 评分（M3-B：FTS5 持久化索引优先，内存 BM25Okapi 兜底）
+        bm25_scores = self._bm25_scores(all_entries, question)
 
         # 城市硬过滤（多城市/对比类问题自动回退全库 + 加权）
         scope, hard_filtered = self._scope_candidates(all_entries, city, question)
         doc_ids = scope if scope is not None else list(range(len(all_entries)))
 
-        return self._rank_scored(
-            all_entries, doc_ids, bm25_scores, top_k, city, city_boost, hard_filtered
-        )
+        return [
+            r
+            for r in self._rank_scored(
+                all_entries, doc_ids, bm25_scores, top_k, city, city_boost, hard_filtered
+            )
+            if r["score"] > 0
+        ]
 
     # ============================================================
     # 向量模型与快照持久化
@@ -803,10 +841,8 @@ class KnowledgeBase:
         scope, hard_filtered = self._scope_candidates(all_entries, city, question)
         doc_ids = scope if scope is not None else list(range(len(all_entries)))
 
-        # BM25 通道
-        self._ensure_bm25(all_entries)
-        question_tokens = list(jieba.cut(question))
-        bm25_scores = self._bm25_index.get_scores(question_tokens)
+        # BM25 通道（M3-B：FTS5 持久化索引优先，内存 BM25Okapi 兜底）
+        bm25_scores = self._bm25_scores(all_entries, question)
 
         # 向量通道（不可用 → 降级为纯 BM25 排序）
         vec_scores = None
@@ -817,9 +853,19 @@ class KnowledgeBase:
                 vec_scores = corpus @ q_vec
         if vec_scores is None:
             print("[INFO] 向量通道不可用，混合检索降级为 BM25")
-            return self._rank_scored(
-                all_entries, doc_ids, bm25_scores, top_k, city, city_boost, hard_filtered
-            )
+            return [
+                r
+                for r in self._rank_scored(
+                    all_entries,
+                    doc_ids,
+                    bm25_scores,
+                    top_k,
+                    city,
+                    city_boost,
+                    hard_filtered,
+                )
+                if r["score"] > 0
+            ]
 
         # RRF 融合（仅统计候选集内的文档）
         rrf_scores = self._rrf_fuse_indices(

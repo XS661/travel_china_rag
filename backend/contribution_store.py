@@ -578,10 +578,6 @@ def append_entry_to_knowledge(entry: dict) -> dict:
     if not city:
         raise ValueError("知识条目必须包含城市信息")
 
-    slug = _slugify_city(city)
-    city_file = KNOWLEDGE_DIR / f"{slug}.json"
-    city_file.parent.mkdir(parents=True, exist_ok=True)
-
     normalized = prepare_knowledge_entry(
         {
             **entry,
@@ -625,45 +621,22 @@ def append_entry_to_knowledge(entry: dict) -> dict:
                 "skip_reason": f"与「{similar.get('title')}」高度相似",
             }
 
-    # 读-改-写阶段加文件锁，防止并发上传互相覆盖丢条目
-    lock_file = _acquire_knowledge_lock()
+    # M3-B：写入 SQLite 事务（WAL 多读单写 + busy 等待，天然并发安全；
+    # UNIQUE (city, id, chunk_id) 允许同投稿切片多条共存，同 id 不重复写）
     try:
-        if city_file.exists():
-            with open(city_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if not isinstance(data, list):
-                data = [data]
-        else:
-            data = []
+        from . import knowledge_db
 
-        meta = next((item for item in data if item.get("id") == "_meta"), None)
-        if meta is None:
-            data.insert(
-                0,
-                {
-                    "id": "_meta",
-                    "domain": "全国旅游",
-                    "city": city,
-                    "category": "_meta",
-                    "sub_category": "",
-                    "title": "",
-                    "content": "",
-                    "keywords": [city],
-                    "source": "系统自动生成",
-                    "source_url": "",
-                    "chunk_id": 0,
-                    "city_tag": entry.get("category", "其他"),
-                    "aliases": [city],
-                },
-            )
-
-        if not any(existing.get("id") == normalized["id"] for existing in data):
-            data.append(normalized)
-
-        with open(city_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    finally:
-        _release_knowledge_lock(lock_file)
+        knowledge_db.ensure_db(KNOWLEDGE_DIR)
+        inserted = knowledge_db.insert_entries([normalized])
+    except Exception as e:
+        print(f"[WARNING] 知识库写入失败：{e}")
+        raise
+    if inserted == 0:
+        return {
+            **normalized,
+            "skipped": True,
+            "skip_reason": "相同条目已存在",
+        }
 
     try:
         from . import city_detector

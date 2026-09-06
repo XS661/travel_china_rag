@@ -2,8 +2,9 @@
 城市名识别模块
 从用户问题中提取城市名，支持城市别名映射（如"帝都" → "北京"）
 
-所有城市信息（列表、别名、标签）均从知识库 JSON 的 _meta 条目自动读取，
-新增城市只需放入 JSON 文件，无需修改本模块。
+所有城市信息（列表、别名、标签）均从知识库的 _meta 元数据自动读取
+（M3-B 起由 SQLite city_meta 表提供，首次自动从 JSON _meta 迁移），
+新增城市只需正常入库，无需修改本模块。
 """
 
 import json
@@ -19,27 +20,29 @@ CITY_TAGS: dict[str, str] = {}  # 城市名 → 标签
 _metadata_loaded: bool = False
 
 
-def _load_city_metadata():
-    """从 knowledge/*.json 的 _meta 条目中自动读取城市元数据"""
-    global COVERED_CITIES, CITY_ALIASES, CITY_TAGS, _metadata_loaded
-    if _metadata_loaded:
-        return
+def _read_city_meta_from_sqlite() -> dict[str, dict]:
+    """从 SQLite city_meta 表读取城市元数据（DB 缺失时返回空）"""
+    try:
+        from .knowledge_db import ensure_db, fetch_city_meta
 
+        ensure_db(KNOWLEDGE_DIR)
+        return fetch_city_meta()
+    except Exception as e:
+        print(f"[WARNING] 城市元数据从 SQLite 读取失败：{e}")
+        return {}
+
+
+def _read_city_meta_from_json() -> dict[str, dict]:
+    """回退路径：从 knowledge/*.json 的 _meta 条目扫描读取"""
+    meta_map: dict[str, dict] = {}
     if not KNOWLEDGE_DIR.exists():
-        return
-
-    cities = []
-    aliases = {}
-    tags = {}
-
+        return meta_map
     for json_file in sorted(KNOWLEDGE_DIR.glob("*.json")):
         try:
             with open(json_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except (json.JSONDecodeError, IOError):
             continue
-
-        # 兼容旧的对象数组格式和新的 {_meta, items} 包装格式。
         if isinstance(data, list):
             meta = next(
                 (
@@ -55,17 +58,34 @@ def _load_city_metadata():
                 meta = data
         else:
             meta = None
-
         city_name = meta.get("city", "") if meta else json_file.stem
-        cities.append(city_name)
+        meta_map[city_name] = {
+            "keywords": meta.get("keywords", []) if meta else [],
+            "aliases": meta.get("aliases", []) if meta else [],
+            "city_tag": meta.get("city_tag", "") if meta else "",
+        }
+    return meta_map
 
-        # 读取别名
-        for alias in meta.get("aliases", []) if meta else []:
-            aliases[alias] = city_name
 
-        # 读取标签
-        city_tag = meta.get("city_tag", "") if meta else ""
-        tags[city_name] = city_tag
+def _load_city_metadata():
+    """加载城市元数据：SQLite city_meta → 回退 JSON _meta 扫描"""
+    global COVERED_CITIES, CITY_ALIASES, CITY_TAGS, _metadata_loaded
+    if _metadata_loaded:
+        return
+
+    meta_map = _read_city_meta_from_sqlite()
+    if not meta_map:
+        meta_map = _read_city_meta_from_json()
+    if not meta_map:
+        return
+
+    cities = list(meta_map.keys())
+    aliases: dict[str, str] = {}
+    tags: dict[str, str] = {}
+    for city, meta in meta_map.items():
+        for alias in meta.get("aliases", []):
+            aliases[alias] = city
+        tags[city] = meta.get("city_tag", "")
 
     # 使用 clear + extend/update 而非重新赋值，
     # 确保其他模块 import 的引用也能看到更新后的值

@@ -31,7 +31,13 @@ _TMP_DIR: str | None = None
 
 def setUpModule():
     global _TMP_DIR
-    from backend import auth_store, city_detector, contribution_store, retriever
+    from backend import (
+        auth_store,
+        city_detector,
+        contribution_store,
+        knowledge_db,
+        retriever,
+    )
 
     _TMP_DIR = tempfile.mkdtemp(prefix="travel_qa_test_")
     _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"] = contribution_store.KNOWLEDGE_DIR
@@ -39,6 +45,7 @@ def setUpModule():
     _ORIG_PATHS["auth_store.DB_PATH"] = auth_store.DB_PATH
     _ORIG_PATHS["retriever.KNOWLEDGE_DIR"] = retriever.KNOWLEDGE_DIR
     _ORIG_PATHS["city_detector.KNOWLEDGE_DIR"] = city_detector.KNOWLEDGE_DIR
+    _ORIG_PATHS["knowledge_db.KNOWLEDGE_DB_PATH"] = knowledge_db.KNOWLEDGE_DB_PATH
 
     contribution_store.KNOWLEDGE_DIR = Path(_TMP_DIR) / "knowledge"
     contribution_store.KNOWLEDGE_DIR.mkdir()
@@ -46,6 +53,7 @@ def setUpModule():
     auth_store.DB_PATH = Path(_TMP_DIR) / "data" / "users.db"
     retriever.KNOWLEDGE_DIR = contribution_store.KNOWLEDGE_DIR
     city_detector.KNOWLEDGE_DIR = contribution_store.KNOWLEDGE_DIR
+    knowledge_db.KNOWLEDGE_DB_PATH = Path(_TMP_DIR) / "data" / "knowledge.db"
 
     # 清空检索/城市元数据缓存，避免残留真实库内容
     retriever.knowledge_base.clear_knowledge_caches()
@@ -54,13 +62,20 @@ def setUpModule():
 
 
 def tearDownModule():
-    from backend import auth_store, city_detector, contribution_store, retriever
+    from backend import (
+        auth_store,
+        city_detector,
+        contribution_store,
+        knowledge_db,
+        retriever,
+    )
 
     contribution_store.KNOWLEDGE_DIR = _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"]
     contribution_store.DB_PATH = _ORIG_PATHS["contribution_store.DB_PATH"]
     auth_store.DB_PATH = _ORIG_PATHS["auth_store.DB_PATH"]
     retriever.KNOWLEDGE_DIR = _ORIG_PATHS["retriever.KNOWLEDGE_DIR"]
     city_detector.KNOWLEDGE_DIR = _ORIG_PATHS["city_detector.KNOWLEDGE_DIR"]
+    knowledge_db.KNOWLEDGE_DB_PATH = _ORIG_PATHS["knowledge_db.KNOWLEDGE_DB_PATH"]
     retriever.knowledge_base.clear_knowledge_caches()
     retriever.knowledge_base.invalidate_vector_cache()
     city_detector._metadata_loaded = False

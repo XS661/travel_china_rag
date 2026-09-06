@@ -7,7 +7,7 @@
 [![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-4B6BFB.svg)](https://platform.deepseek.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-基于 **RAG（检索增强生成）** 架构的智能旅游问答系统。覆盖全国 140+ 城市（当前 3259 条知识），提供景点介绍、美食推荐、交通指南、行程规划等一站式问答服务。用户只需用自然语言提问，系统从本地知识库中检索相关信息，调用大语言模型生成带来源标注的精准回答。
+基于 **RAG（检索增强生成）** 架构的智能旅游问答系统。覆盖全国 140+ 城市（SQLite 知识库当前 3257 条知识），提供景点介绍、美食推荐、交通指南、行程规划等一站式问答服务。用户只需用自然语言提问，系统从本地知识库中检索相关信息，调用大语言模型生成带来源标注的精准回答。
 
 ---
 
@@ -74,7 +74,13 @@
 3. **答案生成**：拼接检索结果 + 系统指令 + 用户问题，调用 DeepSeek API 生成回答
 4. **降级兜底**：API 不可用时直接返回检索片段原文，系统不中断
 
-> **向量索引增量式持久化**：向量/混合检索的语料以快照形式持久化在 `backend/data/vector_index/`（`embeddings.npy` + `manifest.json`）。用户投稿审核通过入库后，下一次检索只会对新增条目做增量编码，不再全库重建（按城市分块对齐，上传到任意城市都只产生小规模增量）。删除该目录、更换 `EMBEDDING_MODEL_NAME` 或提升 `VECTOR_INDEX_VERSION` 可强制全量重建；知识库 JSON 写入通过跨进程文件锁串行化，避免并发上传互相覆盖。
+> **向量索引增量式持久化**：向量/混合检索的语料以快照形式持久化在 `backend/data/vector_index/`（`embeddings.npy` + `manifest.json`）。用户投稿审核通过入库后，下一次检索只会对新增条目做增量编码，不再全库重建（按城市分块对齐，上传到任意城市都只产生小规模增量）。删除该目录、更换 `EMBEDDING_MODEL_NAME` 或提升 `VECTOR_INDEX_VERSION` 可强制全量重建。
+
+> **知识库存储层（M3-B）**：知识条目以 **SQLite（`backend/data/knowledge.db`）为运行时唯一读写目标**（WAL + 事务，`UNIQUE(city, id, chunk_id)` 天然去重），`knowledge/*.json` 仅作自举种子与归档：首次启动或 DB 为空时自动全量迁移（幂等），之后所有写入走 SQLite 事务，不再读改写 JSON。城市元数据（`city_meta` 表）供城市识别使用；`tools/migrate_knowledge_to_sqlite.py` 提供 `init / rebuild / count / dump / shadow` 子命令（`shadow` 在临时库跑全量迁移并核对「JSON 条目数 == 入库数 + 跳过重复数」）。
+
+> **中文全文检索（M3-B）**：BM25 不再每次启动在内存重建，改用 SQLite 内置 **FTS5** 虚拟表（`knowledge_fts`，jieba 预分词建索引），查询走 `bm25()` 排名函数：**AND 优先、OR 降级兜底**（强相关问题只返回全部关键词命中的条目，无结果时放宽到任一命中保召回），并统一过滤中文停用词；得分 min-max 归一化到 (0,1]。条目带 `rid`（SQLite 来源）自动走 FTS5，JSON 回退模式仍用内存 BM25Okapi。
+
+> **上传去重（M3-A）**：用户投稿在调用 LLM 审核前先与库内同城市条目做相似度检测（jieba 分词 Jaccard 变体，`DEDUP_OVERLAP_THRESHOLD=0.6`），重名/重复内容直接 `rejected`；超长投稿按段落/句子切分为多块（`CHUNK_MAX_CHARS=800`，`MIN=200`，尾部小块并入），同 id 多 chunk 入库，后续块标题自动加「（第N部分）」，从源头减少切片抖动。
 
 > **混合检索（M1）**：BM25 与向量两通道改用 **RRF 倒数排名融合**（按排名计分，对分数分布不敏感），每通道各召回 top-50 组成召回池后再取前 5 进提示词；检测到单城市问题时执行**城市硬过滤**（只在该城市条目上检索），多城市/对比类问题自动回退全库加权；可选 **CrossEncoder 重排**（`RERANKER_MODEL_NAME`，默认 `BAAI/bge-reranker-base`，约 1.1GB，设空字符串或加载失败时自动降级为纯 RRF 排序）。
 
@@ -88,9 +94,9 @@
 | **响应式适配** | CSS Media Query + Grid + viewport | 移动全屏 / 平板加宽 / PC（≥1024px）桌面布局 |
 | **后端框架** | FastAPI + Uvicorn                 | 高性能异步，自带 Swagger 文档 |
 | **中文分词** | jieba                             | 分词 + 关键词提取             |
-| **检索算法** | rank-bm25 / 倒排索引 / 文本向量（bge-small-zh） / 混合 | 四种方案可切换，支持一键对比 |
+| **检索算法** | 关键词（倒排索引）/ BM25（SQLite FTS5）/ 文本向量（bge-small-zh） / 混合（RRF） | 四种方案可切换，支持一键对比 |
 | **大模型**   | DeepSeek API（兼容 OpenAI SDK）   | 性价比高，中文能力强          |
-| **知识库**   | JSON（按城市分文件）              | 启动时自动扫描加载            |
+| **知识库**   | SQLite（FTS5 全文索引）+ JSON 种子归档 | 运行时读写 SQLite，JSON 仅自举/归档 |
 | **前端存储** | localStorage                      | 问答历史，最多 20 条          |
 | **内网穿透** | ngrok                             | 手机远程访问（可选）          |
 
@@ -116,16 +122,19 @@ travel_china_rag/
 │   │   └── community.py      #   投稿审核入库 / 社区帖子 / 我的投稿
 │   ├── retriever.py          # 检索服务（KnowledgeBase 单例：关键词 + BM25 + 向量 + 混合）
 │   ├── generator.py          # LLM 调用 + 提示词构造 + 降级方案
-│   ├── city_detector.py      # 城市名识别（从 JSON 自动加载）
+│   ├── city_detector.py      # 城市名识别（SQLite city_meta 优先，JSON 兜底）
+│   ├── knowledge_db.py       # 知识库 SQLite 数据访问层（表结构 + 迁移 + FTS5 维护）
 │   ├── auth_store.py         # 用户 / 历史记录数据访问层（SQLite）
-│   ├── contribution_store.py # 投稿数据访问层 + 知识库写入（JSON 写锁 + 缓存刷新）
-│   ├── knowledge/            # 知识库 JSON 文件（按城市分文件，自动扫描）
+│   ├── contribution_store.py # 投稿数据访问层 + 知识库写入（SQLite 事务 + 缓存刷新）
+│   ├── knowledge/            # 知识库 JSON 种子/归档（按城市分文件，仅自举迁移用）
 │   │   ├── beijing.json      #   ...覆盖 140+ 城市
 │   │   └── ...
-│   ├── data/                 # 运行时数据（.gitignore）：vector_index 向量快照、*.db、knowledge.lock
+│   ├── data/                 # 运行时数据（.gitignore）：knowledge.db / vector_index 向量快照 / *.db
 │   ├── uploads/              # 用户投稿附件目录（.gitignore）
 │   ├── tests/                # 单元测试（unittest，从仓库根目录运行）
-│   │   ├── test_incremental_vector.py   # 增量向量索引测试（FakeModel，无需真实模型）
+│   │   ├── test_incremental_vector.py   # 增量向量索引 + FTS5 检索测试（FakeModel，无需真实模型）
+│   │   ├── test_hybrid_rrf.py           # 混合检索 RRF 融合 / 城市硬过滤 / 重排测试
+│   │   ├── test_dedup_chunking.py       # 上传去重 + 长文切片测试
 │   │   └── test_contribution.py         # 投稿 / 认证 / 社区接口测试（TestClient）
 │   └── .env.example          # 环境变量模板
 ├── frontend/
@@ -136,6 +145,7 @@ travel_china_rag/
 │       └── china-map.js      # 中国地图 SVG 路径数据
 └── tools/                    # 开发工具
     ├── generate_china_map.py # 由 GeoJSON 生成 frontend/generated/china-map.js
+    ├── migrate_knowledge_to_sqlite.py # 知识库 SQLite 迁移/重建/导出/影子验证 CLI
     └── data/
         └── china_provinces.geojson   # 中国省级行政区划源数据
 ```
@@ -255,6 +265,8 @@ curl -X POST http://localhost:8000/api/ask \
 
 ## 📚 知识库结构
 
+> **存储模型（M3-B）**：运行时读写一律走 SQLite `knowledge.db`（表 `knowledge_entries`，主键 `UNIQUE(city, id, chunk_id)`；同名投稿的多个切片可共用 id 共存——修复了旧 JSON 路径"同 id 只保留第一条"的问题）。下方 JSON 格式是**种子/归档格式**：首次启动自动迁移入库，`_meta` 映射到 `city_meta` 表（城市识别用），之后 JSON 不再参与运行时读写。
+
 每条知识为 JSON 对象，包含城市、分类、标题、内容、关键词、来源等字段：
 
 ```json
@@ -297,19 +309,22 @@ curl -X POST http://localhost:8000/api/ask \
 | 文化 | 地方历史、风俗、特色节庆               | ≥3        |
 | 贴士 | 天气、穿着、最佳季节、注意事项         | ≥3        |
 
-**当前统计**：140+ 城市 / 共 **3259 条知识条目**（启动时自动扫描统计）
+**当前统计**：140+ 城市 / 共 **3257 条知识条目**（SQLite 中实际入库数；JSON 种子源为 3260 条，其中 3 条为同城重复 id 被 `UNIQUE(city, id, chunk_id)` 合并）
 
 ---
 
 ## ➕ 新增城市
 
-只需在 `backend/knowledge/` 目录下放入一个符合格式的 `cityname.json` 文件，重启后端即可。程序会自动：
+**运行时写入（推荐）**：用户投稿审核通过后自动写入 SQLite（新城市自动补 `city_meta`），无需人工干预。
 
-- 🔍 扫描识别新城市
-- 🏷️ 加载别名映射和城市标签
-- 🌐 前端城市下拉框和卡片同步更新
+**批量导入（维护场景）**：把符合格式的 `cityname.json` 放入 `backend/knowledge/`，然后执行迁移工具（DB 为空时首次启动也会自动自举迁移）：
 
-**无需修改任何代码**。详见 [§2.3 知识库结构设计](#-知识库结构)。
+```bash
+uv run python -m tools.migrate_knowledge_to_sqlite rebuild   # 清空并按 JSON 全量重建
+uv run python -m tools.migrate_knowledge_to_sqlite count     # 核对当前入库数
+```
+
+程序会自动扫描 JSON → 入库新城市，并刷新城市识别与前端下拉框。**无需修改任何代码**；DB 重建前可先 `shadow <临时db路径>` 在临时库核对数量守恒（`JSON 条目数 == 入库数 + 跳过重复数`）。详见 [§2.3 知识库结构设计](#-知识库结构)。
 
 ---
 
@@ -317,7 +332,7 @@ curl -X POST http://localhost:8000/api/ask \
 
 | 对比维度   | 关键词匹配                        | BM25                                     | 向量相似度                                   | 混合（BM25+向量）                          |
 | ---------- | --------------------------------- | ---------------------------------------- | -------------------------------------------- | ------------------------------------------ |
-| 原理       | jieba 分词 + 倒排索引求交集       | 词频(TF) × 逆文档频率(IDF) + 长度归一化  | 文本向量余弦相似度（bge-small-zh 稠密向量）  | BM25 归一化分数 + 向量余弦相似度加权融合   |
+| 原理       | jieba 分词 + 倒排索引求交集       | FTS5 全文索引 + bm25()（TF×IDF + 长度归一化，AND 优先 OR 兜底） | 文本向量余弦相似度（bge-small-zh 稠密向量）  | BM25 归一化分数 + 向量余弦相似度加权融合   |
 | 实现复杂度 | 低                                | 中                                       | 中高（需加载向量模型）                       | 中高                                        |
 | 检索速度   | 极快                              | 快                                       | 较快（模型加载后毫秒级）                     | 较快                                        |
 | 长文本匹配 | 一般                              | 较好（长度归一化）                       | 好（语义相似度）                             | 好                                          |
@@ -345,7 +360,7 @@ curl -X POST http://localhost:8000/api/ask \
 
 ## 🧪 测试
 
-自动化单元测试覆盖：增量向量索引（快照加载 / 增量编码 / 版本重建）与 投稿、认证、社区接口流程，共 15 个用例。运行方式（仓库根目录）：
+自动化单元测试覆盖：增量向量索引（快照加载 / 增量编码 / 版本重建 / FTS5 全文检索）、混合检索（RRF 融合 / 城市硬过滤 / 重排降级）、上传去重与长文切片、投稿 / 认证 / 社区接口流程，共 **36 个用例**。运行方式（仓库根目录）：
 
 ```bash
 uv run python -m unittest discover -s backend/tests -v
