@@ -8,11 +8,6 @@ import jieba
 
 from . import config
 
-try:
-    import fcntl  # POSIX 文件锁（Windows 不可用时降级为无锁）
-except ImportError:  # pragma: no cover
-    fcntl = None
-
 KNOWLEDGE_DIR = config.KNOWLEDGE_DIR
 UPLOAD_DIR = config.UPLOAD_DIR
 DB_PATH = config.DATA_DIR / "contributions.db"
@@ -104,30 +99,6 @@ def _ensure_storage() -> None:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _acquire_knowledge_lock():
-    """串行化知识库 JSON 的读-改-写，防止并发上传互相覆盖（跨进程文件锁）"""
-    if fcntl is None:
-        return None
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    lock_file = open(DB_PATH.parent / "knowledge.lock", "w")
-    try:
-        fcntl.flock(lock_file, fcntl.LOCK_EX)
-    except OSError:
-        lock_file.close()
-        return None
-    return lock_file
-
-
-def _release_knowledge_lock(lock_file) -> None:
-    if lock_file is None:
-        return
-    try:
-        fcntl.flock(lock_file, fcntl.LOCK_UN)
-    except OSError:
-        pass
-    lock_file.close()
 
 
 def _slugify_city(city: str) -> str:
