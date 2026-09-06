@@ -1,10 +1,55 @@
+"""投稿、认证与社区接口测试（基于 FastAPI TestClient）。
+
+运行方式（仓库根目录）：
+    uv run python -m unittest discover -s backend/tests -v
+"""
+
+import os
+import shutil
+import tempfile
 import unittest
 import uuid
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from main import Source, app
-from contribution_store import prepare_knowledge_entry
+from backend.contribution_store import prepare_knowledge_entry
+from backend.main import app
+from backend.routers.ask import filter_relevant_sources
+from backend.schemas import Source
+
+# ---------------------------------------------------------------------------
+# AuthFlowTests 隔离：把知识库 JSON 目录与 SQLite 数据库重定向到临时目录，
+# 避免测试把投稿写入真实的 backend/knowledge/ 与 backend/data/*.db。
+# （路由处理器在请求时读取模块级路径常量，import 之后改值即生效）
+# ---------------------------------------------------------------------------
+_ORIG_PATHS: dict[str, Path] = {}
+_TMP_DIR: str | None = None
+
+
+def setUpModule():
+    global _TMP_DIR
+    from backend import auth_store, contribution_store
+
+    _TMP_DIR = tempfile.mkdtemp(prefix="travel_qa_test_")
+    _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"] = contribution_store.KNOWLEDGE_DIR
+    _ORIG_PATHS["contribution_store.DB_PATH"] = contribution_store.DB_PATH
+    _ORIG_PATHS["auth_store.DB_PATH"] = auth_store.DB_PATH
+
+    contribution_store.KNOWLEDGE_DIR = Path(_TMP_DIR) / "knowledge"
+    contribution_store.KNOWLEDGE_DIR.mkdir()
+    contribution_store.DB_PATH = Path(_TMP_DIR) / "data" / "contributions.db"
+    auth_store.DB_PATH = Path(_TMP_DIR) / "data" / "users.db"
+
+
+def tearDownModule():
+    from backend import auth_store, contribution_store
+
+    contribution_store.KNOWLEDGE_DIR = _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"]
+    contribution_store.DB_PATH = _ORIG_PATHS["contribution_store.DB_PATH"]
+    auth_store.DB_PATH = _ORIG_PATHS["auth_store.DB_PATH"]
+    if _TMP_DIR is not None:
+        shutil.rmtree(_TMP_DIR, ignore_errors=True)
 
 
 class ContributionStoreTests(unittest.TestCase):
@@ -39,15 +84,13 @@ class ContributionStoreTests(unittest.TestCase):
         self.assertIn("用户亲身经历", item.source)
 
     def test_filter_relevant_sources_for_answer(self):
-        from main import _filter_relevant_sources
-
         results = [
             {"title": "蒙德城景点推荐", "score": 0.92},
             {"title": "冒菜美食攻略", "score": 0.85},
             {"title": "巴渝文化介绍", "score": 0.75},
         ]
 
-        filtered = _filter_relevant_sources(
+        filtered = filter_relevant_sources(
             results,
             "蒙德城适合散步和拍照，推荐风神丘陵和蒙德城遗址。[来源1]",
         )

@@ -1,12 +1,13 @@
 [project]
 name = "travel-china-rag"
 version = "0.1.0"
-description = "Add your description here"
+description = "面向全国的智能旅游问答与推荐系统（RAG + FastAPI）"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "jieba>=0.42.1",
+    "numpy>=1.26",
     "openai>=3.7.0",
     "pydantic>=2.13.5",
     "python-dotenv>=1.2.3",
@@ -16,8 +17,8 @@ dependencies = [
     "uvicorn>=0.52.4",
 ]
 
-[project.scripts]
-travel-china-rag = "travel_china_rag:main"
+[tool.uv]
+package = false
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
