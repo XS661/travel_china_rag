@@ -121,22 +121,24 @@ async def contribute_knowledge(
     )
 
     if review_result["status"] == "approved":
-        entry = review_result["entry"]
-        entry["user_id"] = current_user["id"]
-        entry["username"] = current_user["username"]
-        entry["submission_id"] = submission["id"]
-        append_entry_to_knowledge(entry)
+        entries = review_result.get("entries") or [review_result["entry"]]
+        for entry in entries:
+            entry["user_id"] = current_user["id"]
+            entry["username"] = current_user["username"]
+            entry["submission_id"] = submission["id"]
+            append_entry_to_knowledge(entry)
+        first_entry = entries[0]
         update_submission_status(
             submission["id"],
             status="approved",
             review_note=review_result.get("review_note", "AI 审核通过"),
-            approved_entry=entry,
+            approved_entry=first_entry,
         )
         return ContributionResponse(
             status="approved",
             submission_id=submission["id"],
             review_note=review_result.get("review_note", "AI 审核通过"),
-            entry=entry,
+            entry=first_entry,
             reason=review_result.get("reason", "审核通过"),
         )
 

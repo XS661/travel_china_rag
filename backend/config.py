@@ -39,6 +39,15 @@ HYBRID_RECALL_K = 50
 # 设为空字符串可禁用重排，混合检索退化为纯 RRF 排序
 RERANKER_MODEL_NAME = os.getenv("RERANKER_MODEL_NAME", "BAAI/bge-reranker-base")
 
+# ---------------- 数据质量（M3-A） ----------------
+# 投稿长文切片：content 超过 max 字时按段落/句子边界切成多个 chunk
+CHUNK_MAX_CHARS = int(os.getenv("CHUNK_MAX_CHARS", "800"))
+# 切出的尾部小块低于 min 字时并入前一块（避免碎块）
+CHUNK_MIN_CHARS = int(os.getenv("CHUNK_MIN_CHARS", "200"))
+# 投稿去重：与同城市已有条目的词集重叠度 ≥ 阈值时拒绝入库
+DEDUP_ENABLED = os.getenv("DEDUP_ENABLED", "true").lower() in ("1", "true", "yes")
+DEDUP_OVERLAP_THRESHOLD = float(os.getenv("DEDUP_OVERLAP_THRESHOLD", "0.6"))
+
 # ---------------- 认证 ----------------
 # 演示用内置密钥；生产环境请通过环境变量 SECRET_KEY 覆盖
 SECRET_KEY = os.getenv("SECRET_KEY", "travel-qa-demo-secret-key-v1")

@@ -71,10 +71,15 @@ class HybridRRFTests(unittest.TestCase):
         for city in ("甲市", "乙市"):
             if city not in city_detector.COVERED_CITIES:
                 city_detector.COVERED_CITIES.append(city)
+        # 模拟生产启动时元数据已加载：避免检索路径里 _load_city_metadata()
+        # 重载真实知识库、清掉上面追加的测试城市
+        self._saved_metadata_loaded = city_detector._metadata_loaded
+        city_detector._metadata_loaded = True
 
     def tearDown(self):
         city_detector.COVERED_CITIES.clear()
         city_detector.COVERED_CITIES.extend(self._saved_cities)
+        city_detector._metadata_loaded = self._saved_metadata_loaded
 
     # ---------- RRF ----------
 

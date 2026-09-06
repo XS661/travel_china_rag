@@ -22,6 +22,8 @@ from backend.schemas import Source
 # AuthFlowTests 隔离：把知识库 JSON 目录与 SQLite 数据库重定向到临时目录，
 # 避免测试把投稿写入真实的 backend/knowledge/ 与 backend/data/*.db。
 # （路由处理器在请求时读取模块级路径常量，import 之后改值即生效）
+# 注意：review_contribution 的去重检查会读取 retriever/city_detector 的知识库，
+# 所以这两个模块的 KNOWLEDGE_DIR 也必须重定向，并清空检索缓存。
 # ---------------------------------------------------------------------------
 _ORIG_PATHS: dict[str, Path] = {}
 _TMP_DIR: str | None = None
@@ -29,25 +31,39 @@ _TMP_DIR: str | None = None
 
 def setUpModule():
     global _TMP_DIR
-    from backend import auth_store, contribution_store
+    from backend import auth_store, city_detector, contribution_store, retriever
 
     _TMP_DIR = tempfile.mkdtemp(prefix="travel_qa_test_")
     _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"] = contribution_store.KNOWLEDGE_DIR
     _ORIG_PATHS["contribution_store.DB_PATH"] = contribution_store.DB_PATH
     _ORIG_PATHS["auth_store.DB_PATH"] = auth_store.DB_PATH
+    _ORIG_PATHS["retriever.KNOWLEDGE_DIR"] = retriever.KNOWLEDGE_DIR
+    _ORIG_PATHS["city_detector.KNOWLEDGE_DIR"] = city_detector.KNOWLEDGE_DIR
 
     contribution_store.KNOWLEDGE_DIR = Path(_TMP_DIR) / "knowledge"
     contribution_store.KNOWLEDGE_DIR.mkdir()
     contribution_store.DB_PATH = Path(_TMP_DIR) / "data" / "contributions.db"
     auth_store.DB_PATH = Path(_TMP_DIR) / "data" / "users.db"
+    retriever.KNOWLEDGE_DIR = contribution_store.KNOWLEDGE_DIR
+    city_detector.KNOWLEDGE_DIR = contribution_store.KNOWLEDGE_DIR
+
+    # 清空检索/城市元数据缓存，避免残留真实库内容
+    retriever.knowledge_base.clear_knowledge_caches()
+    retriever.knowledge_base.invalidate_vector_cache()
+    city_detector._metadata_loaded = False
 
 
 def tearDownModule():
-    from backend import auth_store, contribution_store
+    from backend import auth_store, city_detector, contribution_store, retriever
 
     contribution_store.KNOWLEDGE_DIR = _ORIG_PATHS["contribution_store.KNOWLEDGE_DIR"]
     contribution_store.DB_PATH = _ORIG_PATHS["contribution_store.DB_PATH"]
     auth_store.DB_PATH = _ORIG_PATHS["auth_store.DB_PATH"]
+    retriever.KNOWLEDGE_DIR = _ORIG_PATHS["retriever.KNOWLEDGE_DIR"]
+    city_detector.KNOWLEDGE_DIR = _ORIG_PATHS["city_detector.KNOWLEDGE_DIR"]
+    retriever.knowledge_base.clear_knowledge_caches()
+    retriever.knowledge_base.invalidate_vector_cache()
+    city_detector._metadata_loaded = False
     if _TMP_DIR is not None:
         shutil.rmtree(_TMP_DIR, ignore_errors=True)
 

@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
-from backend import city_detector, contribution_store, retriever
+from backend import city_detector, config, contribution_store, retriever
 
 
 class FakeModel:
@@ -87,6 +87,7 @@ class IncrementalVectorIndexTests(unittest.TestCase):
             "contribution_store.KNOWLEDGE_DIR": contribution_store.KNOWLEDGE_DIR,
             "contribution_store.DB_PATH": contribution_store.DB_PATH,
             "city_detector.KNOWLEDGE_DIR": city_detector.KNOWLEDGE_DIR,
+            "config.DEDUP_ENABLED": config.DEDUP_ENABLED,
         }
 
         # 重定向到临时目录
@@ -95,6 +96,9 @@ class IncrementalVectorIndexTests(unittest.TestCase):
         contribution_store.KNOWLEDGE_DIR = self.kb_dir
         contribution_store.DB_PATH = self.tmp / "db" / "contributions.db"
         city_detector.KNOWLEDGE_DIR = self.kb_dir
+        # 本测试的追加条目共用同一份默认内容，恰是去重要拦的重复场景；
+        # 这里只验证写入并发与向量增量，显式关闭去重
+        config.DEDUP_ENABLED = False
 
         # 假模型替换真实模型加载（注入 KnowledgeBase 实例方法）
         self.fake = FakeModel()
@@ -116,6 +120,7 @@ class IncrementalVectorIndexTests(unittest.TestCase):
                 "kb": retriever.knowledge_base,
                 "contribution_store": contribution_store,
                 "city_detector": city_detector,
+                "config": config,
             }[target]
             setattr(module, attr, value)
         self._reset_caches()

@@ -398,6 +398,138 @@ def prepare_knowledge_entry(payload: dict) -> dict:
     return entry
 
 
+# ============================================================
+# 数据质量（M3-A）：长文切片 + 上传去重
+# ============================================================
+
+def _split_content_into_chunks(
+    content: str, max_chars: int = 800, min_chars: int = 200
+) -> list[str]:
+    """把长文本切成适合知识库的块。
+
+    切分优先级：段落边界（\\n）→ 句子边界（。！？；）→ 字符硬切；
+    尾部小块低于 min_chars 时并入前一块，避免碎块污染检索。
+    """
+    if len(content) <= max_chars:
+        return [content]
+
+    chunks: list[str] = []
+    buf: list[str] = []
+    buf_len = 0
+
+    def flush():
+        nonlocal buf, buf_len
+        if buf:
+            chunks.append("\n".join(buf))
+            buf, buf_len = [], 0
+
+    for para in re.split(r"\n\s*\n|\n", content):
+        para = para.strip()
+        if not para:
+            continue
+        if len(para) <= max_chars and buf_len + len(para) + 1 <= max_chars:
+            buf.append(para)
+            buf_len += len(para) + 1
+            continue
+        flush()
+        if len(para) <= max_chars:
+            buf.append(para)
+            buf_len = len(para) + 1
+            continue
+        # 单段超长：按句子拆
+        for sentence in re.split(r"(?<=[。！？；.!?;])", para):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(sentence) > max_chars:
+                flush()
+                for i in range(0, len(sentence), max_chars):
+                    piece = sentence[i : i + max_chars].strip()
+                    if piece:
+                        chunks.append(piece)
+            elif buf_len + len(sentence) + 1 <= max_chars:
+                buf.append(sentence)
+                buf_len += len(sentence) + 1
+            else:
+                flush()
+                buf.append(sentence)
+                buf_len = len(sentence) + 1
+    flush()
+
+    # 合并过小的尾块到前一块
+    merged: list[str] = []
+    for c in chunks:
+        if merged and len(c) < min_chars and len(merged[-1]) + len(c) <= max_chars * 1.5:
+            merged[-1] += "\n" + c
+        else:
+            merged.append(c)
+    return merged
+
+
+def prepare_knowledge_entries(payload: dict) -> list[dict]:
+    """构造入库条目列表；超长投稿自动按段落/句子切成多个 chunk。
+
+    切片后的条目共享同一 id（M2 向量快照按城市块+块内位置定位，可安全复用），
+    chunk_id 从 1 递增；第 2 块起的标题追加「（第 N 部分）」后缀，避免多条
+    同标题干扰排序。
+    """
+    base = prepare_knowledge_entry(payload)
+    content = base["content"]
+    chunks = _split_content_into_chunks(
+        content, config.CHUNK_MAX_CHARS, config.CHUNK_MIN_CHARS
+    )
+    if len(chunks) == 1:
+        return [base]
+
+    entries = []
+    for i, piece in enumerate(chunks):
+        entry = dict(base)
+        entry["content"] = piece
+        entry["chunk_id"] = i + 1
+        if i > 0:
+            entry["title"] = f"{base['title']}（第{i + 1}部分）"
+        entries.append(entry)
+    return entries
+
+
+def _entry_tokens(text: str) -> set[str]:
+    """分词并过滤停用词/单字词，用作去重比较的词集"""
+    return {
+        t
+        for t in jieba.lcut(text)
+        if t.strip() and len(t) >= 2 and t not in STOP_WORDS
+    }
+
+
+def find_similar_entry(
+    entries: list[dict],
+    city: str,
+    title: str,
+    content: str,
+    threshold: float = 0.6,
+) -> dict | None:
+    """在同城市条目中查找与 (title, content) 高度相似的条目。
+
+    相似度 = 词集交集大小 / 两词集较小者大小（Jaccard 变体），
+    只与同城市条目比较，避免跨城误伤。未命中返回 None。
+    """
+    target = _entry_tokens(f"{title} {content}")
+    if not target:
+        return None
+    best: dict | None = None
+    best_overlap = 0.0
+    for entry in entries:
+        if entry.get("city") != city or entry.get("id") == "_meta":
+            continue
+        other = _entry_tokens(f"{entry.get('title', '')} {entry.get('content', '')}")
+        if not other:
+            continue
+        overlap = len(target & other) / min(len(target), len(other))
+        if overlap > best_overlap:
+            best_overlap, best = overlap, entry
+    return best if best_overlap >= threshold else None
+
+
 def list_community_posts(username: str | None = None) -> list[dict]:
     _ensure_storage()
     conn = sqlite3.connect(DB_PATH)
@@ -458,6 +590,40 @@ def append_entry_to_knowledge(entry: dict) -> dict:
             "username": entry.get("username") or "",
         }
     )
+
+    # M3-A：兜底去重——防止绕过审核直接入库；同一投稿的切片块之间互不比
+    if config.DEDUP_ENABLED:
+        try:
+            from . import retriever as _retriever
+
+            candidates = [
+                e
+                for e in _retriever.knowledge_base.load()
+                if e.get("id") != normalized["id"]
+                and (
+                    not normalized.get("submission_id")
+                    or e.get("submission_id") != normalized.get("submission_id")
+                )
+            ]
+            similar = find_similar_entry(
+                candidates,
+                city,
+                normalized["title"],
+                normalized["content"],
+                threshold=config.DEDUP_OVERLAP_THRESHOLD,
+            )
+        except Exception as e:
+            print(f"[WARNING] 入库去重检查失败，跳过：{e}")
+            similar = None
+        if similar is not None:
+            print(
+                f"[INFO] 去重跳过入库：与「{similar.get('title')}」高度相似（{city}）"
+            )
+            return {
+                **normalized,
+                "skipped": True,
+                "skip_reason": f"与「{similar.get('title')}」高度相似",
+            }
 
     # 读-改-写阶段加文件锁，防止并发上传互相覆盖丢条目
     lock_file = _acquire_knowledge_lock()
@@ -565,6 +731,32 @@ def review_contribution(
         "source": dynamic_source,
     }
 
+    # M3-A：上传去重——与同城市已有知识条目比较，高度相似直接拒绝（不再调用 LLM）
+    if config.DEDUP_ENABLED:
+        try:
+            from . import retriever as _retriever
+
+            similar = find_similar_entry(
+                _retriever.knowledge_base.load(),
+                city.strip(),
+                final_title,
+                cleaned,
+                threshold=config.DEDUP_OVERLAP_THRESHOLD,
+            )
+        except Exception as e:
+            print(f"[WARNING] 去重检查失败，跳过：{e}")
+            similar = None
+        if similar is not None:
+            return {
+                "status": "rejected",
+                "reason": (
+                    f"内容与已有知识「{similar.get('title') or similar.get('id')}」"
+                    "高度相似，疑似重复投稿，已拒绝"
+                ),
+                "entry": None,
+                "similar_id": similar.get("id", ""),
+            }
+
     try:
         from openai import OpenAI
 
@@ -596,7 +788,7 @@ def review_contribution(
         if not parsed.get("city") or not parsed.get("content"):
             raise ValueError("AI audit did not produce a valid entry")
 
-        cleaned_entry = prepare_knowledge_entry(
+        cleaned_entries = prepare_knowledge_entries(
             {
                 "city": parsed.get("city") or city,
                 "title": parsed.get("title") or final_title,
@@ -609,14 +801,16 @@ def review_contribution(
         return {
             "status": "approved",
             "reason": "AI 已整理并审核通过，已纳入知识库",
-            "entry": cleaned_entry,
+            "entry": cleaned_entries[0],
+            "entries": cleaned_entries,
             "review_note": "大模型已整理并审核通过",
         }
     except Exception:
-        fallback_entry = prepare_knowledge_entry(payload)
+        fallback_entries = prepare_knowledge_entries(payload)
         return {
             "status": "approved",
             "reason": "上传内容已自动整理并校验通过，已纳入知识库",
-            "entry": fallback_entry,
+            "entry": fallback_entries[0],
+            "entries": fallback_entries,
             "review_note": "已按规则自动整理并校验合规性",
         }
