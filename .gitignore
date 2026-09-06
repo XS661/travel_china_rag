@@ -34,6 +34,11 @@ Desktop.ini
 # Logs
 *.log
 
+# 地图生成管线临时产物（tools/generate_china_cities.py 下载的省数据中间文件等）
+_tmp_*.json
+/*_full.json
+debug_*.png
+
 # Generated runtime data
 backend/data/
 backend/uploads/
