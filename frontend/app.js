@@ -67,6 +67,55 @@ function getProvinceForCity(city) {
     return province ? province.name : '';
 }
 
+// 把投稿里的地点解析成省级或市级，用于省市两级地图着色与列表筛选。
+function resolvePostLocation(city) {
+    const value = (city || '').trim();
+    if (!value) return { province: '', city: '', level: 'none' };
+
+    const provinces = window.CHINA_PROVINCES || [];
+    const province = provinces.find((item) => item.name === value || item.short === value);
+    if (province) {
+        return { province: province.name, city: '', level: 'province' };
+    }
+
+    const cities = window.CHINA_CITIES || [];
+    const cityMatch = cities.find((item) => item.name === value || item.short === value);
+    if (cityMatch) {
+        return { province: cityMatch.province, city: cityMatch.name, level: 'city' };
+    }
+
+    // 兼容旧的 CITY_PROVINCE_MAP，避免部分简称或后台数据无法命中市区表。
+    const provinceName = getProvinceForCity(value);
+    if (provinceName) {
+        return { province: provinceName, city: value, level: 'city' };
+    }
+
+    return { province: '', city: '', level: 'none' };
+}
+
+async function getUserPostLocations() {
+    const token = getToken();
+    if (!token) return [];
+
+    try {
+        const res = await fetch(`${API_BASE}/api/my-contributions`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return [];
+
+        const posts = await res.json();
+        if (!Array.isArray(posts)) return [];
+
+        return posts.map((post) => ({
+            ...resolvePostLocation(post.city),
+            post,
+        }));
+    } catch (err) {
+        console.warn('获取投稿位置失败', err);
+        return [];
+    }
+}
+
 async function getUserPostProvinces() {
     const token = getToken();
     if (!token) return new Set();
@@ -131,6 +180,10 @@ const els = {
     meUserCard: $('me-user-card'),
     meMap: $('me-map'),
     chinaMap: $('china-map'),
+    meMapToolbar: $('me-map-toolbar'),
+    mapZoomIn: $('map-zoom-in'),
+    mapZoomOut: $('map-zoom-out'),
+    mapZoomReset: $('map-zoom-reset'),
     meTabs: document.querySelectorAll('.me-tab'),
     meContent: $('me-content'),
     meLogout: $('me-logout'),
@@ -150,6 +203,10 @@ let currentCity = '';
 let currentView = 'home';        // 当前激活的页面视图
 let currentMeSection = null; // 我的页当前分区（null 时显示中国地图）
 let currentMeProvince = '';  // 从地图点击进入时筛选的投稿省份
+let currentMeCity = '';      // 从市级地图点击进入时筛选的投稿城市
+let currentMapProvince = ''; // 非空时表示当前地图正在展示某个省份的市级区划
+let currentMapBaseView = '0 0 1000 720';
+let currentMapZoomFactor = 1;
 let abortController = null;
 let typingTimer = null;
 let toastTimer = null;
@@ -332,13 +389,26 @@ function bindEvents() {
     els.meTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const section = tab.dataset.section || 'history';
-            // 通过底部 tab 切换时取消地图省份筛选，避免残留到后面的“我的投稿”视图
+            // 切换分区时清空地图层级与投稿筛选，避免残留到后续视图
+            currentMapProvince = '';
             currentMeProvince = '';
+            currentMeCity = '';
             // 再次点击当前分区时取消选择，回到中国地图
             currentMeSection = currentMeSection === section ? null : section;
             showMeSection();
         });
     });
+    if (els.mapZoomIn) els.mapZoomIn.addEventListener('click', () => {
+        applyMapZoomFactor(els.chinaMap, currentMapZoomFactor * 1.25);
+    });
+    if (els.mapZoomOut) els.mapZoomOut.addEventListener('click', () => {
+        applyMapZoomFactor(els.chinaMap, currentMapZoomFactor / 1.25);
+    });
+    if (els.mapZoomReset) els.mapZoomReset.addEventListener('click', () => {
+        currentMapZoomFactor = 1;
+        if (els.chinaMap) els.chinaMap.setAttribute('viewBox', currentMapBaseView);
+    });
+    initMapDrag(els.chinaMap);
     els.meLogout.addEventListener('click', logoutUser);
 
     // 上传页：未登录引导 + 表单提交
@@ -1129,17 +1199,278 @@ async function showMeSection() {
         await renderMeSection();
     } else {
         currentMeProvince = '';
+        currentMeCity = '';
         await renderChinaMap();
     }
+}
+
+function setMapBaseView(svg, view) {
+    currentMapBaseView = view;
+    currentMapZoomFactor = 1;
+    if (svg) svg.setAttribute('viewBox', view);
+}
+
+function applyMapZoomFactor(svg, factor) {
+    if (!svg) return;
+    const parts = currentMapBaseView.split(/\s+/).map(Number);
+    const x = parts[0] || 0;
+    const y = parts[1] || 0;
+    const width = parts[2] || 1000;
+    const height = parts[3] || 720;
+    const zoom = Math.min(4, Math.max(1, factor || 1));
+    currentMapZoomFactor = zoom;
+
+    const viewWidth = width / zoom;
+    const viewHeight = height / zoom;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    svg.setAttribute('viewBox', `${cx - viewWidth / 2} ${cy - viewHeight / 2} ${viewWidth} ${viewHeight}`);
+}
+
+function parseSvgViewBox(svg) {
+    if (!svg) return [0, 0, 1000, 720];
+    const viewBox = (svg.getAttribute('viewBox') || '0 0 1000 720').trim().split(/\s+/).map(Number);
+    return viewBox.length === 4 && viewBox.every(Number.isFinite)
+        ? viewBox
+        : [0, 0, 1000, 720];
+}
+
+function initMapDrag(svg) {
+    if (!svg) return;
+
+    const supportsPointer = typeof window.PointerEvent === 'function';
+    const supportsTouch = typeof window.ontouchstart !== 'undefined' || navigator.maxTouchPoints > 0;
+    let dragging = false;
+    let moved = false;
+    let pointerId = null;
+    let startClientX = 0;
+    let startClientY = 0;
+    let startView = [0, 0, 1000, 720];
+    let startMatrix = null;
+    let suppressClick = false;
+    let suppressTimer = null;
+
+    const getBaseBounds = () => {
+        const parts = (currentMapBaseView || '0 0 1000 720').trim().split(/\s+/).map(Number);
+        const x = Number.isFinite(parts[0]) ? parts[0] : 0;
+        const y = Number.isFinite(parts[1]) ? parts[1] : 0;
+        const width = Number.isFinite(parts[2]) && parts[2] > 0 ? parts[2] : 1000;
+        const height = Number.isFinite(parts[3]) && parts[3] > 0 ? parts[3] : 720;
+        return { x, y, width, height };
+    };
+
+    const screenPointToUser = (clientX, clientY, matrix) => {
+        if (matrix && svg.createSVGPoint) {
+            const point = svg.createSVGPoint();
+            point.x = clientX;
+            point.y = clientY;
+            const userPoint = point.matrixTransform(matrix.inverse());
+            return { x: userPoint.x, y: userPoint.y };
+        }
+
+        const rect = svg.getBoundingClientRect();
+        const view = parseSvgViewBox(svg);
+        const scaleX = rect.width ? view[2] / rect.width : 1;
+        const scaleY = rect.height ? view[3] / rect.height : 1;
+        return {
+            x: view[0] + (clientX - rect.left) * scaleX,
+            y: view[1] + (clientY - rect.top) * scaleY,
+        };
+    };
+
+    const beginDrag = (clientX, clientY, id) => {
+        dragging = true;
+        moved = false;
+        pointerId = id;
+        startClientX = clientX;
+        startClientY = clientY;
+        startView = parseSvgViewBox(svg);
+        startMatrix = svg.getScreenCTM ? svg.getScreenCTM() : null;
+        suppressClick = false;
+        if (suppressTimer) {
+            clearTimeout(suppressTimer);
+            suppressTimer = null;
+        }
+        svg.classList.add('is-dragging');
+    };
+
+    const moveDrag = (clientX, clientY, event) => {
+        if (!dragging) return;
+        const dx = clientX - startClientX;
+        const dy = clientY - startClientY;
+        if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+            moved = true;
+            suppressClick = true;
+        }
+        if (!moved) return;
+
+        if (event && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+        }
+
+        const matrix = startMatrix || (svg.getScreenCTM ? svg.getScreenCTM() : null);
+        const startUser = screenPointToUser(startClientX, startClientY, matrix);
+        const currentUser = screenPointToUser(clientX, clientY, matrix);
+        const panX = currentUser.x - startUser.x;
+        const panY = currentUser.y - startUser.y;
+
+        const bounds = getBaseBounds();
+        const viewWidth = startView[2] || bounds.width;
+        const viewHeight = startView[3] || bounds.height;
+        const minX = bounds.x;
+        const minY = bounds.y;
+        const maxX = bounds.x + Math.max(0, bounds.width - viewWidth);
+        const maxY = bounds.y + Math.max(0, bounds.height - viewHeight);
+        const clamp = (value, lo, hi) => Math.min(Math.max(value, Math.min(lo, hi)), Math.max(lo, hi));
+
+        svg.setAttribute('viewBox', [
+            clamp(startView[0] - panX, minX, maxX),
+            clamp(startView[1] - panY, minY, maxY),
+            startView[2],
+            startView[3],
+        ].join(' '));
+    };
+
+    const endDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        svg.classList.remove('is-dragging');
+        pointerId = null;
+        startMatrix = null;
+
+        if (moved) {
+            suppressClick = true;
+            if (suppressTimer) clearTimeout(suppressTimer);
+            suppressTimer = setTimeout(() => {
+                suppressClick = false;
+                suppressTimer = null;
+            }, 0);
+            moved = false;
+        }
+    };
+
+    if (supportsPointer) {
+        svg.addEventListener('pointerdown', (event) => {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            beginDrag(event.clientX, event.clientY, event.pointerId);
+            event.preventDefault();
+        });
+        window.addEventListener('pointermove', (event) => {
+            if (pointerId !== null && event.pointerId !== pointerId) return;
+            moveDrag(event.clientX, event.clientY, event);
+        });
+        window.addEventListener('pointerup', (event) => {
+            if (pointerId !== null && event.pointerId !== pointerId) return;
+            endDrag();
+        });
+        window.addEventListener('pointercancel', (event) => {
+            if (pointerId !== null && event.pointerId !== pointerId) return;
+            endDrag();
+        });
+    } else if (supportsTouch) {
+        svg.addEventListener('touchstart', (event) => {
+            if (!event.touches || !event.touches[0]) return;
+            beginDrag(event.touches[0].clientX, event.touches[0].clientY, 1);
+            event.preventDefault();
+        }, { passive: false });
+        window.addEventListener('touchmove', (event) => {
+            if (!dragging || !event.touches || !event.touches[0]) return;
+            moveDrag(event.touches[0].clientX, event.touches[0].clientY, event);
+        }, { passive: false });
+        window.addEventListener('touchend', endDrag);
+        window.addEventListener('touchcancel', endDrag);
+    } else {
+        svg.addEventListener('mousedown', (event) => {
+            if (event.button !== 0) return;
+            beginDrag(event.clientX, event.clientY, null);
+            event.preventDefault();
+        });
+        window.addEventListener('mousemove', (event) => {
+            if (!dragging) return;
+            moveDrag(event.clientX, event.clientY, event);
+        });
+        window.addEventListener('mouseup', endDrag);
+    }
+
+    svg.addEventListener('click', (event) => {
+        if (!suppressClick) return;
+        event.stopPropagation();
+        event.preventDefault();
+        suppressClick = false;
+    }, true);
+}
+
+function getSvgPathBounds(paths) {
+    const source = (Array.isArray(paths) ? paths.join(' ') : paths || '').toString();
+    const numbers = (source.match(/[-+]?\d+(?:\.\d+)?/g) || []).map(Number);
+    if (!numbers.length) return { x: 0, y: 0, width: 1000, height: 720 };
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i + 1 < numbers.length; i += 2) {
+        const x = numbers[i];
+        const y = numbers[i + 1];
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+    }
+
+    if (![minX, minY, maxX, maxY].every(Number.isFinite)) {
+        return { x: 0, y: 0, width: 1000, height: 720 };
+    }
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function focusTooltip(tooltip, bounds, padding = 14) {
+    if (!tooltip) return;
+    tooltip.setAttribute('x', bounds.x + 18);
+    tooltip.setAttribute('y', bounds.y + 22);
+    tooltip.setAttribute('text-anchor', 'start');
+}
+
+function fitSvgView(svg, paths, padding = 18) {
+    const bounds = getSvgPathBounds(paths);
+    if (!svg || !bounds) return;
+    const width = Math.max(bounds.width, 1);
+    const height = Math.max(bounds.height, 1);
+    setMapBaseView(svg, `${bounds.x - padding} ${bounds.y - padding} ${width + padding * 2} ${height + padding * 2}`);
 }
 
 async function renderChinaMap() {
     const svg = els.chinaMap;
     if (!svg || !window.CHINA_PROVINCES || !window.CHINA_PROVINCES.length) return;
 
-    const postProvinces = await getUserPostProvinces();
+    // 每次切换层级都从该层级的完整视野开始，避免上一次放大状态残留。
+    setMapBaseView(svg, '0 0 1000 720');
+
+    const toolbar = els.meMapToolbar;
+    if (toolbar) {
+        toolbar.hidden = !currentMapProvince;
+        toolbar.innerHTML = '';
+    }
+
+    if (currentMapProvince) {
+        await renderChinaCityMap(svg, toolbar, currentMapProvince);
+    } else {
+        await renderChinaNationalMap(svg);
+    }
+}
+
+async function renderChinaNationalMap(svg) {
+    const locations = await getUserPostLocations();
+    const provinceLevel = new Set(
+        locations.filter((loc) => loc.level === 'province').map((loc) => loc.province)
+    );
+    const cityLevel = new Set(
+        locations.filter((loc) => loc.level === 'city').map((loc) => loc.province)
+    );
+
     const paths = window.CHINA_PROVINCES.map((province) => {
-        const hasUserPost = postProvinces.has(province.name);
+        const meta = (window.CHINA_PROVINCE_META || []).find((item) => item.name === province.name);
+        const hasUserPost = provinceLevel.has(province.name);
         const classes = [
             'map-province',
             province.covered ? 'covered' : '',
@@ -1149,9 +1480,117 @@ async function renderChinaMap() {
     }).join('');
 
     svg.innerHTML = `${paths}<text class="china-map-tooltip" x="500" y="80" text-anchor="middle"></text>`;
+    setMapBaseView(svg, '0 0 1000 720');
 
     const tooltip = svg.querySelector('.china-map-tooltip');
     svg.querySelectorAll('path.map-province').forEach((path) => {
+        const provinceName = path.dataset.name || '';
+        const meta = (window.CHINA_PROVINCE_META || []).find((item) => item.name === provinceName);
+        const hasProvincePost = provinceLevel.has(provinceName);
+        const hasCityPost = cityLevel.has(provinceName);
+
+        path.addEventListener('mouseenter', () => {
+            tooltip.textContent = provinceName || '';
+        });
+        path.addEventListener('mouseleave', () => {
+            tooltip.textContent = '';
+        });
+        path.addEventListener('click', () => {
+            if (!provinceName) return;
+
+            const hasAnyPost = hasProvincePost || hasCityPost;
+            if (meta && meta.hasCityRegions) {
+                currentMapProvince = provinceName;
+                currentMeProvince = '';
+                currentMeCity = '';
+                currentMeSection = null;
+                renderChinaMap();
+            } else if (hasAnyPost) {
+                currentMapProvince = '';
+                currentMeProvince = provinceName;
+                currentMeCity = '';
+                currentMeSection = 'posts';
+                showMeSection();
+            }
+        });
+    });
+}
+
+async function renderChinaCityMap(svg, toolbar, provinceName) {
+    const locations = await getUserPostLocations();
+    const cityPosts = new Set(
+        locations
+            .filter((loc) => loc.level === 'city' && loc.province === provinceName)
+            .map((loc) => loc.city)
+    );
+    const provinceHasPosts = locations.some((loc) => loc.province === provinceName);
+
+    const meta = (window.CHINA_PROVINCE_META || []).find(
+        (item) => item.name === provinceName || item.short === provinceName
+    );
+    const province = (window.CHINA_PROVINCES || []).find((item) => item.name === provinceName);
+
+    if (!meta || !meta.hasCityRegions) {
+        const hasUserPost = locations.some(
+            (loc) => loc.province === provinceName && loc.level === 'province'
+        );
+        const provinceClasses = [
+            'map-province',
+            province && province.covered ? 'covered' : '',
+            hasUserPost ? 'has-user-post' : ''
+        ].filter(Boolean).join(' ');
+        svg.innerHTML = province
+            ? `<path class="${provinceClasses}" d="${province.path}" data-name="${escapeHtml(province.name)}"></path><text class="china-map-tooltip" x="500" y="80" text-anchor="middle"></text>`
+            : '<text class="china-map-tooltip" x="500" y="80" text-anchor="middle"></text>';
+
+        if (province) {
+            fitSvgView(svg, province.path, 18);
+        }
+
+        renderMapToolbar(toolbar, provinceName, provinceHasPosts);
+
+        const tooltip = svg.querySelector('.china-map-tooltip');
+        const path = svg.querySelector('path.map-province');
+        if (path) {
+            path.addEventListener('mouseenter', () => {
+                tooltip.textContent = path.dataset.name || '';
+            });
+            path.addEventListener('mouseleave', () => {
+                tooltip.textContent = '';
+            });
+            path.addEventListener('click', () => {
+                currentMapProvince = '';
+                currentMeProvince = provinceName;
+                currentMeCity = '';
+                currentMeSection = 'posts';
+                showMeSection();
+            });
+        }
+        return;
+    }
+
+    const cities = (window.CHINA_CITIES || []).filter((item) => item.province === provinceName);
+    const paths = cities.map((city) => {
+        const hasUserPost = cityPosts.has(city.name) || cityPosts.has(city.short);
+        const classes = ['map-city', hasUserPost ? 'has-user-post' : ''].filter(Boolean).join(' ');
+        return `<path class="${classes}" d="${city.path}" data-name="${escapeHtml(city.name)}" data-short="${escapeHtml(city.short)}"></path>`;
+    }).join('');
+
+    svg.innerHTML = `${paths}<text class="china-map-tooltip" x="500" y="80" text-anchor="middle"></text>`;
+
+    const tooltip = svg.querySelector('.china-map-tooltip');
+    const focusedCity = cities.find(
+        (city) => cityPosts.has(city.name) || cityPosts.has(city.short)
+    );
+    if (focusedCity) {
+        fitSvgView(svg, focusedCity.path, 42);
+        focusTooltip(tooltip, getSvgPathBounds(focusedCity.path), 18);
+    } else {
+        fitSvgView(svg, province ? province.path : '', 18);
+        if (province) focusTooltip(tooltip, getSvgPathBounds(province.path), 18);
+    }
+
+    svg.querySelectorAll('path.map-city').forEach((path) => {
         path.addEventListener('mouseenter', () => {
             tooltip.textContent = path.dataset.name || '';
         });
@@ -1159,14 +1598,52 @@ async function renderChinaMap() {
             tooltip.textContent = '';
         });
         path.addEventListener('click', () => {
-            const provinceName = path.dataset.name || '';
-            if (!path.classList.contains('has-user-post') || !provinceName) return;
+            const cityName = path.dataset.name || '';
+            if (!path.classList.contains('has-user-post') || !cityName) return;
 
-            currentMeProvince = provinceName;
+            currentMeProvince = '';
+            currentMeCity = cityName;
             currentMeSection = 'posts';
             showMeSection();
         });
     });
+
+    renderMapToolbar(toolbar, provinceName, provinceHasPosts);
+}
+
+function renderMapToolbar(toolbar, provinceName, provinceHasPosts) {
+    if (!toolbar) return;
+
+    const meta = (window.CHINA_PROVINCE_META || []).find(
+        (item) => item.name === provinceName || item.short === provinceName
+    );
+    const short = (meta && meta.short) || provinceName;
+
+    toolbar.innerHTML = `
+        <button type="button" class="map-toolbar-btn" data-action="back-to-national">← 返回全国</button>
+        ${provinceHasPosts ? `<button type="button" class="map-toolbar-btn" data-action="province-posts">查看${escapeHtml(short)}全部投稿</button>` : ''}
+    `;
+    toolbar.hidden = false;
+
+    const backBtn = toolbar.querySelector('[data-action="back-to-national"]');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            currentMapProvince = '';
+            currentMeProvince = '';
+            currentMeCity = '';
+            renderChinaMap();
+        });
+    }
+
+    const provincePostsBtn = toolbar.querySelector('[data-action="province-posts"]');
+    if (provincePostsBtn) {
+        provincePostsBtn.addEventListener('click', () => {
+            currentMeProvince = provinceName;
+            currentMeCity = '';
+            currentMeSection = 'posts';
+            showMeSection();
+        });
+    }
 }
 
 function renderMeSection() {
@@ -1179,7 +1656,7 @@ function renderMeSection() {
             els.meContent.innerHTML = '<div class="home-empty">登录后即可查看自己的投稿。</div>';
             return;
         }
-        loadUserHomePosts(els.meContent, currentMeProvince);
+        loadUserHomePosts(els.meContent, { province: currentMeProvince, city: currentMeCity });
     }
 }
 
@@ -1406,10 +1883,13 @@ async function openCommunityPostDetail(postId, username = '', sourceTitle = '', 
     }
 }
 
-async function loadUserHomePosts(container = els.meContent, province = '') {
+async function loadUserHomePosts(container = els.meContent, filter = {}) {
     const token = getToken();
     if (!token) return;
     if (!container) return;
+
+    const filterCity = filter.city || '';
+    const filterProvince = filter.province || '';
 
     try {
         const res = await fetch(`${API_BASE}/api/my-contributions`, {
@@ -1425,20 +1905,25 @@ async function loadUserHomePosts(container = els.meContent, province = '') {
         const posts = await res.json();
 
         const listPosts = Array.isArray(posts) ? posts : [];
-        const filtered = province
-            ? listPosts.filter((post) => getProvinceForCity(post.city) === province)
-            : listPosts;
+        const filtered = listPosts.filter((post) => {
+            const loc = resolvePostLocation(post.city);
+            if (filterCity) return loc.city === filterCity;
+            if (filterProvince) return loc.province === filterProvince;
+            return true;
+        });
 
-        const backButton = province
+        const hasFilter = !!(filterCity || filterProvince);
+        const filterLabel = filterCity || filterProvince || '';
+        const backButton = hasFilter
             ? `<button type="button" class="map-back-link" data-action="back-to-map">← 返回地图</button>`
             : '';
-        const listHeader = province
-            ? `<div class="province-posts-head">${escapeHtml(province)}的投稿</div>`
+        const listHeader = hasFilter
+            ? `<div class="province-posts-head">${escapeHtml(filterLabel)}的投稿</div>`
             : '';
 
         if (!filtered.length) {
-            const emptyText = province
-                ? `还没有发布过${escapeHtml(province)}的旅游经验。`
+            const emptyText = hasFilter
+                ? `还没有发布过${escapeHtml(filterLabel)}的旅游经验。`
                 : '还没有发布过心得，快去上传经验吧。';
             container.innerHTML = `
                 ${backButton}${listHeader}
@@ -1470,7 +1955,7 @@ async function loadUserHomePosts(container = els.meContent, province = '') {
             card.addEventListener('click', async () => {
                 const postId = card.dataset.postId;
                 if (!postId) return;
-                await openUserPostDetail(postId, container, province);
+                await openUserPostDetail(postId, container, filter);
             });
         });
 
@@ -1487,14 +1972,17 @@ function bindPostsBackToMap(container) {
     backBtn.addEventListener('click', () => {
         currentMeSection = null;
         currentMeProvince = '';
+        currentMeCity = '';
         showMeSection();
     });
 }
 
-async function openUserPostDetail(postId, container = els.meContent, province = '') {
+async function openUserPostDetail(postId, container = els.meContent, filter = {}) {
     const token = getToken();
     if (!token) return;
     if (!container) return;
+
+    const filterLabel = filter.city || filter.province || '';
 
     try {
         const res = await fetch(`${API_BASE}/api/my-contributions/${postId}`, {
@@ -1510,7 +1998,7 @@ async function openUserPostDetail(postId, container = els.meContent, province = 
         const post = await res.json();
         container.innerHTML = `
             <div class="user-post-detail">
-                <button type="button" class="map-back-link" data-action="back-to-list">← 返回${province ? escapeHtml(province) + '投稿' : '我的投稿'}</button>
+                <button type="button" class="map-back-link" data-action="back-to-list">← 返回${filterLabel ? escapeHtml(filterLabel) + '投稿' : '我的投稿'}</button>
                 <div class="post-detail-header">
                     <span class="post-city">📍 ${escapeHtml(post.city || '未知城市')}</span>
                     <span class="post-time">${formatTime(post.created_at || post.updated_at)}</span>
@@ -1526,7 +2014,7 @@ async function openUserPostDetail(postId, container = els.meContent, province = 
 
         const backBtn = container.querySelector('[data-action="back-to-list"]');
         if (backBtn) {
-            backBtn.addEventListener('click', () => loadUserHomePosts(container, province));
+            backBtn.addEventListener('click', () => loadUserHomePosts(container, filter));
         }
 
         const deleteBtn = container.querySelector('[data-action="delete-post"]');
@@ -1543,7 +2031,7 @@ async function openUserPostDetail(postId, container = els.meContent, province = 
                     return;
                 }
                 showToast('帖子已删除', 'ok');
-                await loadUserHomePosts(container, province);
+                await loadUserHomePosts(container, filter);
             });
         }
     } catch (err) {

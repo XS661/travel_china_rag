@@ -1777,6 +1777,7 @@
             flex: none;
             padding: 8px 8px 4px;
             overflow: hidden;
+            position: relative;
         }
 
         #china-map {
@@ -1785,7 +1786,55 @@
             height: auto;
             min-height: 0;
             max-height: 44vh;
-            touch-action: manipulation;
+            cursor: grab;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        #china-map,
+        #china-map * {
+            touch-action: none;
+        }
+
+        #china-map.is-dragging {
+            cursor: grabbing;
+        }
+
+        .map-zoom-controls {
+            position: absolute;
+            right: 14px;
+            top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 2;
+        }
+
+        .map-zoom-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--stroke-strong);
+            background: rgba(7, 11, 20, 0.78);
+            color: var(--dim);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .map-zoom-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .map-zoom-btn:hover {
+            color: var(--gold-2);
+            border-color: rgba(247, 184, 74, 0.75);
+            background: rgba(247, 184, 74, 0.12);
         }
 
         .map-province {
@@ -1813,6 +1862,54 @@
         .map-province.has-user-post:hover {
             fill: rgba(255, 94, 94, 0.72);
             stroke: #ffb2b2;
+        }
+
+        .map-city {
+            fill: #05070d;
+            stroke: rgba(170, 183, 205, 0.34);
+            stroke-width: 0.75;
+            cursor: pointer;
+            transition: fill 0.2s ease, stroke 0.2s ease;
+        }
+
+        .map-city:hover {
+            fill: rgba(255, 255, 255, 0.09);
+            stroke: rgba(247, 184, 74, 0.7);
+        }
+
+        .map-city.has-user-post {
+            fill: rgba(255, 74, 74, 0.6);
+            stroke: rgba(255, 118, 118, 0.9);
+        }
+
+        .map-city.has-user-post:hover {
+            fill: rgba(255, 94, 94, 0.74);
+            stroke: #ffb2b2;
+        }
+
+        .map-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 4px 2px 8px;
+        }
+
+        .map-toolbar-btn {
+            border: 1px solid var(--stroke-strong);
+            border-radius: 999px;
+            padding: 6px 11px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--dim);
+            font-size: 12px;
+            line-height: 1;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .map-toolbar-btn:hover {
+            color: var(--gold-2);
+            border-color: rgba(247, 184, 74, 0.75);
+            background: rgba(247, 184, 74, 0.08);
         }
 
         .china-map-tooltip {

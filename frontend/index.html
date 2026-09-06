@@ -195,7 +195,30 @@
 
                     <!-- 中国地图（默认视图） -->
                     <div class="me-map-card card-panel" id="me-map" aria-label="中国地图">
+                        <div class="map-toolbar" id="me-map-toolbar" hidden></div>
                         <svg id="china-map" viewBox="0 0 1000 720" role="img" aria-label="中国地图"></svg>
+                        <div class="map-zoom-controls" aria-label="地图缩放">
+                            <button type="button" class="map-zoom-btn" id="map-zoom-in" aria-label="放大" title="放大">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="7"></circle>
+                                    <path d="m20 20-4-4"></path>
+                                    <path d="M11 8v6M8 11h6"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="map-zoom-btn" id="map-zoom-out" aria-label="缩小" title="缩小">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="7"></circle>
+                                    <path d="m20 20-4-4"></path>
+                                    <path d="M8 11h6"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="map-zoom-btn" id="map-zoom-reset" aria-label="重置缩放" title="重置缩放">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 4v6h6"></path>
+                                    <path d="M4 10a8 8 0 1 1 2 6"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- 分区切换 -->
@@ -299,6 +322,7 @@
     </div>
 
     <script src="/static/china-map.js"></script>
+    <script src="/static/china-cities.js"></script>
     <script src="/static/app.js"></script>
 </body>
 
