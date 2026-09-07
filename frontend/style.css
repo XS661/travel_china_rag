@@ -549,13 +549,63 @@
             color: transparent;
         }
 
-        .welcome-sub {
-            font-size: 12.5px;
-            color: var(--dim);
-            line-height: 1.9;
-            letter-spacing: 0.5px;
-            margin: 11px auto 24px;
-            max-width: 300px;
+        .city-marquee {
+            position: relative;
+            width: 100%;
+            max-width: 780px;
+            height: 48px;
+            margin: 8px auto 28px;
+            overflow: hidden;
+            mask-image: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+            -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+        }
+
+        .city-marquee-track {
+            display: flex;
+            align-items: center;
+            width: max-content;
+            height: 48px;
+            animation: city-marquee-scroll 50s linear infinite;
+            will-change: transform;
+        }
+
+        .city-marquee-item {
+            font-family: var(--font-display);
+            font-size: 25px;
+            font-weight: 900;
+            letter-spacing: 0;
+            line-height: 1;
+            white-space: nowrap;
+            background: linear-gradient(135deg, #ffffff 0%, var(--gold-2) 48%, var(--gold) 72%, var(--rose) 125%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 2px 14px rgba(247, 184, 74, 0.22));
+        }
+
+        .city-marquee-item--alt {
+            background: linear-gradient(135deg, #d9fbff 0%, #7ed7ff 36%, #7fb8ff 70%, var(--gold-2) 122%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            filter: drop-shadow(0 2px 14px rgba(63, 217, 255, 0.2));
+        }
+
+        .city-marquee-sep {
+            flex: 0 0 auto;
+            margin: 0 18px;
+            color: rgba(247, 184, 74, 0.62);
+            font-size: 16px;
+            line-height: 1;
+            text-shadow: 0 0 12px rgba(247, 184, 74, 0.35);
+        }
+
+        @keyframes city-marquee-scroll {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(-50%);
+            }
         }
 
         .welcome-chips {
@@ -2568,10 +2618,18 @@
                 letter-spacing: 7px;
             }
 
-            .welcome-sub {
-                font-size: 14px;
-                max-width: none;
-                margin-bottom: 30px;
+            .city-marquee {
+                max-width: 840px;
+                height: 56px;
+                margin-bottom: 34px;
+            }
+
+            .city-marquee-track {
+                height: 56px;
+            }
+
+            .city-marquee-item {
+                font-size: 30px;
             }
 
             .welcome-chips {

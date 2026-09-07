@@ -13,7 +13,7 @@ const compareMode = location.pathname.includes('/compare');
 const HISTORY_KEY = 'travel_qa_history';
 const MAX_HISTORY = 20;
 
-const METHOD_LABELS = { bm25: 'BM25', keyword: '关键词', vector: '向量', hybrid: '混合' };
+const METHOD_LABELS = { bm25: '相关排序', keyword: '精确匹配', vector: '语义理解', hybrid: '智能综合' };
 
 // 城市名 → 省级行政区名，用于把用户投稿定位到中国地图上的省份
 const CITY_PROVINCE_MAP = {
@@ -256,6 +256,18 @@ async function loadCities() {
         // 缓存城市名列表
         window._cityList = cities.map(c => c.city);
 
+        // 首页覆盖城市数量跟随后端实际城市数，不再写死为 8
+        const cityCount = cities.length;
+        const metaDescription = document.querySelector('meta[name="description"]');
+        if (metaDescription) {
+            metaDescription.setAttribute(
+                'content',
+                `走遍中国 · 智能旅游助手 — 覆盖 ${cityCount} 个旅游城市，景点 / 美食 / 交通 / 行程一站式问答`
+            );
+        }
+
+        renderCityMarquee(window._cityList);
+
         // 1. 动态生成快捷标签（从各城市采样热门关键词）
         const sampleQueries = [
             { q: '北京故宫门票多少钱？', label: '北京故宫' },
@@ -298,6 +310,28 @@ async function loadCities() {
     } catch (e) {
         console.warn('⚠️ 无法加载城市列表，使用默认值', e);
     }
+}
+
+// 把全部已覆盖城市名做成艺术字跑马灯，随机打乱顺序并持续滑动。
+function renderCityMarquee(cityNames) {
+    const container = document.getElementById('city-marquee');
+    if (!container) return;
+
+    const names = Array.isArray(cityNames) && cityNames.length
+        ? cityNames.filter(Boolean)
+        : ['北京', '上海', '成都', '杭州', '西安', '广州', '重庆', '苏州'];
+    const shuffled = [...names].sort(() => Math.random() - 0.5);
+
+    const half = shuffled.map((city, index) => {
+        const altClass = index % 2 === 0 ? '' : ' city-marquee-item--alt';
+        return `<span class="city-marquee-item${altClass}">${escapeHtml(city)}</span><span class="city-marquee-sep" aria-hidden="true">✦</span>`;
+    }).join('');
+
+    container.innerHTML = `<div class="city-marquee-track">${half}${half}</div>`;
+
+    const duration = Math.max(32, shuffled.length * 0.72);
+    const track = container.querySelector('.city-marquee-track');
+    if (track) track.style.animationDuration = `${duration}s`;
 }
 
 // ========== 事件绑定 ==========

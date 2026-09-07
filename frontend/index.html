@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#070b14">
-    <meta name="description" content="走遍中国 · 智能旅游助手 — 覆盖 8 个热门旅游城市，景点 / 美食 / 交通 / 行程一站式问答">
+    <meta name="description" content="走遍中国 · 智能旅游助手 — 覆盖全国旅游城市，景点 / 美食 / 交通 / 行程一站式问答">
     <title>走遍中国 · 智能旅游助手</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,7 +72,7 @@
                     <section class="welcome" id="welcome">
                         <div class="welcome-mark">🏔️</div>
                         <h2 class="welcome-title">下一站，去哪？</h2>
-                        <p class="welcome-sub">覆盖 8 个热门旅游城市<br>景点 · 美食 · 交通 · 行程 一站式问答</p>
+                        <div class="city-marquee" id="city-marquee" aria-label="已覆盖旅游城市"></div>
                         <div class="welcome-chips" id="welcome-chips"><!-- 由 JS 动态生成 --></div>
                     </section>
 
@@ -93,10 +93,10 @@
                 <footer class="composer">
                     <!-- 检索方式 -->
                     <div class="method-toggle" id="method-toggle" role="group" aria-label="选择检索方式">
-                        <button type="button" class="method-option active" data-method="bm25">BM25</button>
-                        <button type="button" class="method-option" data-method="keyword">关键词</button>
-                        <button type="button" class="method-option" data-method="vector">向量</button>
-                        <button type="button" class="method-option" data-method="hybrid">混合</button>
+                        <button type="button" class="method-option active" data-method="bm25">相关排序</button>
+                        <button type="button" class="method-option" data-method="keyword">精确匹配</button>
+                        <button type="button" class="method-option" data-method="vector">语义理解</button>
+                        <button type="button" class="method-option" data-method="hybrid">智能综合</button>
                     </div>
                     <div class="compare-banner" id="compare-banner" hidden>⚖️ 对比模式 · 四种检索方式横向对比</div>
 
