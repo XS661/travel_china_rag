@@ -52,3 +52,8 @@ DEDUP_OVERLAP_THRESHOLD = float(os.getenv("DEDUP_OVERLAP_THRESHOLD", "0.6"))
 # 演示用内置密钥；生产环境请通过环境变量 SECRET_KEY 覆盖
 SECRET_KEY = os.getenv("SECRET_KEY", "travel-qa-demo-secret-key-v1")
 TOKEN_TTL_DAYS = 7
+
+# ---------------- 上下文记忆 ----------------
+MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "15"))
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "12000"))
+SESSION_TTL_DAYS = 30

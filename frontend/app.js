@@ -211,6 +211,26 @@ const AUTH_TOKEN_KEY = 'travel_qa_token';
 const AUTH_USER_KEY = 'travel_qa_user';
 const HISTORY_MODE_KEY = 'travel_qa_history_scope';
 const FOLLOWS_KEY = 'travel_qa_follows';
+const SESSION_ID_KEY = 'travel_qa_session_id';
+
+let currentSessionId = localStorage.getItem(SESSION_ID_KEY) || null;
+
+function getSessionId() {
+    return currentSessionId;
+}
+
+function setSessionId(id) {
+    currentSessionId = id;
+    if (id) {
+        try { localStorage.setItem(SESSION_ID_KEY, id); } catch (e) {}
+    } else {
+        try { localStorage.removeItem(SESSION_ID_KEY); } catch (e) {}
+    }
+}
+
+function resetSessionId() {
+    setSessionId(null);
+}
 
 // 对比模式：仅通过 /compare 地址进入
 if (compareMode) {
@@ -887,16 +907,19 @@ async function runCompare(question, city) {
         let status = 'ok';
         let results = [];
         try {
+            const methodBody = {
+                question: question,
+                city: city,
+                top_k: 3,
+                method: m.method,
+                raw: true,
+            };
+            const sid = getSessionId();
+            if (sid) methodBody.session_id = sid;
             const res = await fetch(`${API_BASE}/api/ask`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    city: city,
-                    top_k: 3,
-                    method: m.method,
-                    raw: true,
-                }),
+                body: JSON.stringify(methodBody),
                 signal: abortController.signal,
             });
             if (!res.ok) throw new Error('http ' + res.status);
@@ -956,21 +979,27 @@ async function askQuestion() {
     abortController = new AbortController();
 
     const city = currentCity || null;
+    const user = getCurrentUser();
 
     try {
         let data;
         if (compareMode) {
             data = await runCompare(question, city);
         } else {
+            const requestBody = {
+                question: question,
+                city: city,
+                top_k: 5,
+                method: currentMethod,
+            };
+            const sid = getSessionId();
+            if (sid) requestBody.session_id = sid;
+            if (user && user.id) requestBody.user_id = user.id;
+
             const res = await fetch(`${API_BASE}/api/ask`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    city: city,
-                    top_k: 5,
-                    method: currentMethod
-                }),
+                body: JSON.stringify(requestBody),
                 signal: abortController.signal,
             });
 
@@ -988,6 +1017,8 @@ async function askQuestion() {
                 throw new Error(`请求失败 (${res.status})`);
             }
             data = await res.json();
+
+            if (data.session_id) setSessionId(data.session_id);
         }
 
         // 先上屏用户问题
@@ -2018,6 +2049,7 @@ function clearAll() {
     hideTyping();
     hideToast();
     els.chatScroll.scrollTop = 0;
+    resetSessionId();
 }
 
 // ========== 问答历史 (localStorage) ==========

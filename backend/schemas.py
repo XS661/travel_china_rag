@@ -13,6 +13,12 @@ class AskRequest(BaseModel):
     raw: bool = Field(
         default=False, description="true 时只返回检索结果（含分数），不调用 LLM"
     )
+    session_id: str | None = Field(
+        default=None, description="会话 ID，传入后启用上下文记忆"
+    )
+    user_id: str | None = Field(
+        default=None, description="用户 ID（可选，用于关联登录用户的会话）"
+    )
 
 
 class Source(BaseModel):
@@ -33,6 +39,8 @@ class AskResponse(BaseModel):
     sources: list[Source]
     retrieval_method: str
     model: str
+    session_id: str | None = None
+    context_cities: list[str] | None = None
 
 
 class CityInfo(BaseModel):
