@@ -34,9 +34,14 @@ def _ensure_db() -> None:
             detected_city TEXT,
             timestamp TEXT NOT NULL,
             created_at TEXT NOT NULL,
+            full_data TEXT,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
         """)
+    # 旧库迁移：补充 full_data 列（存放完整问答数据，用于前端点击历史记录恢复对话）
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(user_history)").fetchall()]
+    if "full_data" not in cols:
+        conn.execute("ALTER TABLE user_history ADD COLUMN full_data TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_user_history_user_id ON user_history(user_id, created_at DESC)"
     )
@@ -202,17 +207,26 @@ def list_user_history(user_id: str) -> list[dict]:
         (user_id,),
     ).fetchall()
     conn.close()
-    return [
-        {
-            "id": row["id"],
-            "question": row["question"],
-            "answer": row["answer"],
-            "detected_city": row["detected_city"],
-            "timestamp": row["timestamp"],
-            "created_at": row["created_at"],
-        }
-        for row in rows
-    ]
+    result = []
+    for row in rows:
+        full_data = None
+        if row["full_data"]:
+            try:
+                full_data = json.loads(row["full_data"])
+            except (ValueError, TypeError):
+                full_data = None
+        result.append(
+            {
+                "id": row["id"],
+                "question": row["question"],
+                "answer": row["answer"],
+                "detected_city": row["detected_city"],
+                "timestamp": row["timestamp"],
+                "created_at": row["created_at"],
+                "full_data": full_data,
+            }
+        )
+    return result
 
 
 def append_user_history(
@@ -222,6 +236,7 @@ def append_user_history(
     answer: str | None = None,
     detected_city: str | None = None,
     timestamp: str | None = None,
+    full_data: dict | None = None,
 ) -> dict:
     _ensure_db()
     if not user_id:
@@ -229,10 +244,16 @@ def append_user_history(
     ts = timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     history_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    full_data_json = None
+    if full_data is not None:
+        try:
+            full_data_json = json.dumps(full_data, ensure_ascii=False)
+        except (TypeError, ValueError):
+            full_data_json = None
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT INTO user_history (id, user_id, question, answer, detected_city, timestamp, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (history_id, user_id, question.strip(), answer, detected_city, ts, created_at),
+        "INSERT INTO user_history (id, user_id, question, answer, detected_city, timestamp, created_at, full_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (history_id, user_id, question.strip(), answer, detected_city, ts, created_at, full_data_json),
     )
     conn.commit()
     conn.close()
@@ -243,6 +264,7 @@ def append_user_history(
         "detected_city": detected_city,
         "timestamp": ts,
         "created_at": created_at,
+        "full_data": full_data,
     }
 
 

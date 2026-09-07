@@ -204,6 +204,54 @@ class AuthFlowTests(unittest.TestCase):
         self.assertEqual(len(listed.json()), 1)
         self.assertEqual(listed.json()[0]["question"], "成都怎么玩")
 
+    def test_history_stores_full_data(self):
+        """历史记录应保存完整问答数据（full_data），供前端点击恢复对话。"""
+        username = f"histfd_{uuid.uuid4().hex[:6]}"
+        reg = self.client.post(
+            "/api/register",
+            json={"username": username, "password": "Secret123!"},
+        )
+        token = reg.json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        full_data = {
+            "answer": "完整回答：宽窄巷子、春熙路、大熊猫基地……",
+            "detected_city": "成都",
+            "retrieval_method": "hybrid",
+            "model": "test-model",
+            "sources": [{"title": "成都攻略", "source": "用户亲身经历"}],
+        }
+        created = self.client.post(
+            "/api/history",
+            json={
+                "question": "成都怎么玩",
+                "answer": "完整回答：宽窄巷子、春熙路、大熊猫基地……"[:100],
+                "detected_city": "成都",
+                "timestamp": "2026-09-07T00:00:00Z",
+                "full_data": full_data,
+            },
+            headers=headers,
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        self.assertEqual(created.json()["full_data"], full_data)
+
+        listed = self.client.get("/api/history", headers=headers)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        entries = listed.json()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["full_data"], full_data)
+
+        # 不带 full_data 的旧式写入仍兼容，返回 null
+        self.client.post(
+            "/api/history",
+            json={"question": "旧记录", "timestamp": "2026-09-07T00:00:01Z"},
+            headers=headers,
+        )
+        listed2 = self.client.get("/api/history", headers=headers).json()
+        legacy = [e for e in listed2 if e["question"] == "旧记录"]
+        self.assertEqual(len(legacy), 1)
+        self.assertIsNone(legacy[0]["full_data"])
+
     def test_my_contributions_are_scoped_by_user(self):
         username = f"posts_{uuid.uuid4().hex[:6]}"
         reg = self.client.post(

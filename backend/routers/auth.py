@@ -71,6 +71,7 @@ async def add_history_entry(
         answer=entry.get("answer"),
         detected_city=entry.get("detected_city"),
         timestamp=entry.get("timestamp"),
+        full_data=entry.get("full_data"),
     )
     return HistoryEntry(**record)
 

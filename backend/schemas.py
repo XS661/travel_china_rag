@@ -89,3 +89,4 @@ class HistoryEntry(BaseModel):
     detected_city: str | None = None
     timestamp: str
     created_at: str
+    full_data: dict | None = None

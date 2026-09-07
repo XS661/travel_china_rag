@@ -712,11 +712,17 @@ function renderMarkdown(text) {
             continue;
         }
 
-        // 有序列表
-        const ol = rawLine.match(/^\s*\d+[.、)]\s+(.*)/);
+        // 有序列表（记录起始编号，模型从非 1 开始时也能正确续排）
+        // "1. x" / "1) x" 需空格；中文顿号/全角括号 "1、x" "1）x" 可不带空格
+        const ol = rawLine.match(/^\s*(\d+)(?:[.)]\s+|[、）]\s*)(.*)/);
         if (ol) {
-            if (listType !== 'ol') { closeList(); listType = 'ol'; html += '<ol>'; }
-            html += `<li>${inlineMd(ol[1])}</li>`;
+            if (listType !== 'ol') {
+                closeList();
+                listType = 'ol';
+                const start = parseInt(ol[1], 10);
+                html += start > 1 ? `<ol start="${start}">` : '<ol>';
+            }
+            html += `<li>${inlineMd(ol[2])}</li>`;
             continue;
         }
 
@@ -727,8 +733,11 @@ function renderMarkdown(text) {
         // 分隔线
         if (/^\s*([-*_]\s*){3,}\s*$/.test(rawLine)) { closeList(); html += '<hr>'; continue; }
 
-        closeList();
+        // 空行不关闭列表：LLM 回答常在列表项之间夹空行，
+        // 若立即关闭会把有序列表拆成多个 <ol>，序号全部从 1 重新开始
         if (rawLine.trim() === '') { continue; }
+
+        closeList();
         html += `<p>${inlineMd(rawLine)}</p>`;
     }
 
@@ -2125,6 +2134,7 @@ async function saveToHistory(question, data) {
         answer: data.answer ? data.answer.substring(0, 100) + '...' : '',
         detected_city: data.detected_city,
         timestamp: new Date().toISOString(),
+        full_data: data,
     };
 
     if (token) {
@@ -2182,18 +2192,26 @@ async function renderHistoryInto(container, opts = {}) {
         el.addEventListener('click', () => {
             const idx = parseInt(el.dataset.idx);
             const item = history[idx];
-            if (item && item.fullData) {
-                els.questionInput.value = item.question;
-                if (item.fullData.detected_city) {
-                    setCityFilter(item.fullData.detected_city);
-                }
-                closeSheet();
-                // 从其它页面恢复时回到主页
-                if (opts.navigateHome || currentView !== 'home') {
-                    switchView('home', { skipLoad: true });
+            if (!item) return;
+            // 本地存储用 fullData，服务端返回用 full_data
+            const full = item.fullData || item.full_data;
+
+            els.questionInput.value = item.question;
+            closeSheet();
+            // 从其它页面恢复时回到主页
+            if (opts.navigateHome || currentView !== 'home') {
+                switchView('home', { skipLoad: true });
+            }
+
+            if (full) {
+                if (full.detected_city) {
+                    setCityFilter(full.detected_city);
                 }
                 pushUserMessage(item.question);
-                pushAiMessage(item.fullData);
+                pushAiMessage(full);
+            } else {
+                // 旧记录没有完整数据：回到主页重新提问获取回答
+                askQuestion();
             }
         });
     });
