@@ -14,6 +14,7 @@ from ..contribution_store import (
     update_submission_status,
 )
 from ..deps import get_current_user
+from ..file_parser import FileParseError, extract_text_from_file
 from ..schemas import ContributionResponse
 
 router = APIRouter(tags=["社区"])
@@ -84,15 +85,24 @@ async def contribute_knowledge(
     """用户上传亲身经历/文案/附件，审核后纳入知识库"""
     text_from_file = ""
     file_name = None
+    file_error = None
     if file is not None:
         file_name = file.filename or "upload"
         raw = await file.read()
         if raw:
-            candidate = raw.decode("utf-8", errors="ignore")
-            if candidate.strip():
-                text_from_file = candidate.strip()
+            try:
+                candidate = extract_text_from_file(file_name, raw)
+            except FileParseError as e:
+                file_error = str(e)
+            else:
+                if candidate.strip():
+                    text_from_file = candidate.strip()
 
     merged_content = (content or "").strip() or text_from_file
+
+    # 文件读不出有效文本时给出明确原因，绝不把乱码/垃圾字节写入知识库
+    if file_error and not merged_content.strip():
+        raise HTTPException(status_code=400, detail=file_error)
     if not merged_content.strip():
         raise HTTPException(status_code=400, detail="请填写文案或上传文本文件")
 

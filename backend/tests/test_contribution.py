@@ -4,11 +4,13 @@
     uv run python -m unittest discover -s backend/tests -v
 """
 
+import io
 import os
 import shutil
 import tempfile
 import unittest
 import uuid
+import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -307,6 +309,94 @@ class AuthFlowTests(unittest.TestCase):
         self.assertEqual(detail.status_code, 200, detail.text)
         self.assertEqual(detail.json()["username"], username)
         self.assertEqual(detail.json()["city"], "新艾利都")
+
+
+class FileUploadFlowTests(unittest.TestCase):
+    """文件上传投稿：编码探测（GBK/UTF-8）与二进制格式必须产出正确文本或明确错误。"""
+
+    def setUp(self):
+        self.client = TestClient(app)
+        username = f"upload_{uuid.uuid4().hex[:6]}"
+        reg = self.client.post(
+            "/api/register",
+            json={"username": username, "password": "Secret123!"},
+        )
+        self.assertEqual(reg.status_code, 200, reg.text)
+        self.token = reg.json()["token"]
+        self.headers = {"Authorization": f"Bearer {self.token}"}
+
+    def _upload(self, filename, raw, content="", content_type="application/octet-stream"):
+        data = {
+            "city": "成都",
+            "title": "成都文件上传测试",
+            "content": content,
+            "source": "用户亲身经历",
+            "source_type": "file",
+            "notes": "上传流程测试",
+        }
+        return self.client.post(
+            "/api/contribute",
+            data=data,
+            files={"file": (filename, raw, content_type)},
+            headers=self.headers,
+        )
+
+    def test_gbk_file_content_is_stored_correctly(self):
+        gbk_text = "我在春熙路附近吃了火锅，味道非常好，晚上适合在锦里逛街拍照。"
+        resp = self._upload("experience.txt", gbk_text.encode("gbk"), content_type="text/plain")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertTrue(resp.json()["submission_id"])
+
+        detail = self.client.get(
+            f"/api/my-contributions/{resp.json()['submission_id']}",
+            headers=self.headers,
+        )
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertIn("火锅", detail.json()["content"])
+
+    def test_docx_file_content_is_stored_correctly(self):
+        body = (
+            "<w:p><w:r><w:t>成都宽窄巷子适合上午慢逛，中午在附近吃川菜，下午去人民公园喝茶。</w:t></w:r></w:p>"
+        )
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr(
+                "word/document.xml",
+                '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                f"<w:body>{body}</w:body></w:document>",
+            )
+        resp = self._upload(
+            "trip.docx",
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        detail = self.client.get(
+            f"/api/my-contributions/{resp.json()['submission_id']}",
+            headers=self.headers,
+        )
+        self.assertIn("宽窄巷子", detail.json()["content"])
+
+    def test_garbage_binary_upload_is_rejected_with_clear_error(self):
+        resp = self._upload("bad.txt", bytes(range(256)) * 8, content_type="text/plain")
+        self.assertEqual(resp.status_code, 400, resp.text)
+        detail = resp.json()["detail"]
+        self.assertNotIn("请填写文案", detail)  # 必须是具体原因，而不是笼统提示
+        self.assertIn("编码", detail)
+
+    def test_legacy_doc_upload_is_rejected_with_guidance(self):
+        resp = self._upload("old.doc", b"\xd0\xcf\xd4\xc4\xcf\xc2\xdb")
+        self.assertEqual(resp.status_code, 400, resp.text)
+        self.assertIn("另存为", resp.json()["detail"])
+
+    def test_content_field_takes_precedence_over_present_file(self):
+        # 正文非空时以正文为准，不受文件内容影响（保留原有文案优先语义）
+        resp = self._upload(
+            "bad.bin",
+            b"\x00\x01\x02garbage",
+            content="我在春熙路附近吃了火锅，味道非常好，适合晚上去逛夜市。",
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
 
 
 if __name__ == "__main__":
