@@ -13,10 +13,6 @@ const compareMode = location.pathname.includes('/compare');
 const HISTORY_KEY = 'travel_qa_history';
 const MAX_HISTORY = 20;
 
-const CITY_EMOJI_MAP = {
-    '北京': '🏯', '杭州': '🌸', '成都': '🐼', '西安': '⚔️',
-    '重庆': '🌆', '广州': '🥟', '苏州': '🏡', '长沙': '🌶️',
-};
 const METHOD_LABELS = { bm25: 'BM25', keyword: '关键词', vector: '向量', hybrid: '混合' };
 
 // 城市名 → 省级行政区名，用于把用户投稿定位到中国地图上的省份
@@ -147,7 +143,6 @@ const els = {
     conversation: $('conversation'),
     welcome: $('welcome'),
     welcomeChips: $('welcome-chips'),
-    cityChips: $('city-chips'),
     methodToggle: $('method-toggle'),
     compareBanner: $('compare-banner'),
     questionInput: $('question-input'),
@@ -173,10 +168,6 @@ const els = {
     sheet: $('history-sheet'),
     sheetBackdrop: $('sheet-backdrop'),
     historyList: $('history-list'),
-    citySheet: $('city-sheet'),
-    citySearchInput: $('city-search-input'),
-    cityGrid: $('city-grid'),
-    cityPanelClose: $('city-panel-close'),
     tabbar: $('tabbar'),
     communityTitle: $('community-title'),
     communityList: $('community-list'),
@@ -244,25 +235,8 @@ async function loadCities() {
 
         // 缓存城市名列表
         window._cityList = cities.map(c => c.city);
-        window._cityData = cities; // 完整城市数据，供城市选择面板使用
 
-        // 1. 渲染城市 chips：仅「全部 + 随机 5 个城市 + 更多」，完整列表由面板展开
-        els.cityChips.innerHTML = '';
-        els.cityChips.appendChild(makeChip('🌍', '全部', ''));
-        shuffle(cities).slice(0, 5).forEach(c => {
-            const emoji = CITY_EMOJI_MAP[c.city] || '📍';
-            els.cityChips.appendChild(makeChip(emoji, c.city, c.city));
-        });
-        const moreBtn = document.createElement('button');
-        moreBtn.type = 'button';
-        moreBtn.className = 'chip more-chip';
-        moreBtn.id = 'city-more-btn';
-        moreBtn.setAttribute('aria-label', '展开全部城市列表');
-        moreBtn.innerHTML = '<span>更多</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
-        els.cityChips.appendChild(moreBtn);
-        renderCityGrid();
-
-        // 2. 动态生成快捷标签（从各城市采样热门关键词）
+        // 1. 动态生成快捷标签（从各城市采样热门关键词）
         const sampleQueries = [
             { q: '北京故宫门票多少钱？', label: '北京故宫' },
             { q: '成都火锅有什么推荐？', label: '成都火锅' },
@@ -306,25 +280,6 @@ async function loadCities() {
     }
 }
 
-function makeChip(emoji, label, value) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chip';
-    chip.dataset.city = value || '';
-    chip.innerHTML = `<span class="chip-emoji">${emoji}</span><span>${label}</span>`;
-    return chip;
-}
-
-// Fisher-Yates 洗牌（返回新数组，不修改原数组）
-function shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-}
-
 // ========== 事件绑定 ==========
 function bindEvents() {
     // 提问
@@ -336,9 +291,6 @@ function bindEvents() {
     // 历史抽屉
     els.historyBtn.addEventListener('click', toggleSheet);
     els.sheetBackdrop.addEventListener('click', closeSheet);
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeSheet();
-    });
     els.historyClear.addEventListener('click', async () => {
         const token = getToken();
         if (token) {
@@ -370,59 +322,6 @@ function bindEvents() {
             e.preventDefault();
             askQuestion();
         }
-    });
-
-    // 城市 chips 点击
-    els.cityChips.addEventListener('click', (e) => {
-        const chip = e.target.closest('.chip');
-        if (!chip) return;
-        // 「更多」→ 展开完整城市列表面板
-        if (chip.id === 'city-more-btn' || chip.classList.contains('more-chip')) {
-            openCityPanel();
-            return;
-        }
-        const city = chip.dataset.city || '';
-        setCityFilter(city);
-        if (city && !els.questionInput.value.trim()) {
-            els.questionInput.value = `${city}有什么好玩的地方？`;
-        }
-        els.questionInput.focus();
-    });
-
-    // 城市 chips 行：右滑展开完整城市列表
-    let swipeStartX = null;
-    let swipeStartY = null;
-    els.cityChips.addEventListener('touchstart', (e) => {
-        const t = e.touches[0];
-        swipeStartX = t.clientX;
-        swipeStartY = t.clientY;
-    }, { passive: true });
-    els.cityChips.addEventListener('touchend', (e) => {
-        if (swipeStartX === null) return;
-        const t = e.changedTouches[0];
-        const dx = t.clientX - swipeStartX;
-        const dy = t.clientY - swipeStartY;
-        swipeStartX = null;
-        swipeStartY = null;
-        // 明显向右、且以横向为主的手势 → 展开城市列表
-        if (dx > 48 && Math.abs(dx) > Math.abs(dy) * 1.2) {
-            openCityPanel();
-        }
-    }, { passive: true });
-
-    // 城市选择面板
-    els.cityPanelClose.addEventListener('click', closeCityPanel);
-    els.citySearchInput.addEventListener('input', renderCityGrid);
-    els.cityGrid.addEventListener('click', (e) => {
-        const cell = e.target.closest('.city-cell');
-        if (!cell) return;
-        const city = cell.dataset.city || '';
-        setCityFilter(city);
-        if (city && !els.questionInput.value.trim()) {
-            els.questionInput.value = `${city}有什么好玩的地方？`;
-        }
-        closeCityPanel();
-        els.questionInput.focus();
     });
 
     // 快捷标签点击
@@ -662,9 +561,6 @@ function logoutUser() {
 
 function setCityFilter(city) {
     currentCity = city;
-    els.cityChips.querySelectorAll('.chip').forEach(c => {
-        c.classList.toggle('active', c.dataset.city === city);
-    });
 }
 
 // ========== 辅助函数 ==========
@@ -2242,70 +2138,17 @@ async function loadHistory() {
     await renderHistory();
 }
 
-// ========== 历史抽屉 / 城市面板开关 ==========
+// ========== 历史抽屉开关 ==========
 function toggleSheet() {
     const open = !els.sheet.classList.contains('open');
     els.sheet.classList.toggle('open', open);
-    els.citySheet.classList.remove('open');
     els.sheetBackdrop.classList.toggle('show', open);
     if (open) renderHistory();
 }
 
 function closeSheet() {
     els.sheet.classList.remove('open');
-    els.citySheet.classList.remove('open');
     els.sheetBackdrop.classList.remove('show');
-}
-
-function openCityPanel() {
-    closeSheet(); // 同时关闭历史抽屉
-    els.citySheet.classList.add('open');
-    els.sheetBackdrop.classList.add('show');
-    renderCityGrid();
-    els.citySearchInput.value = '';
-    // 桌面端自动聚焦搜索框；移动端避免弹出键盘遮挡
-    if (window.matchMedia('(min-width: 1024px)').matches) {
-        els.citySearchInput.focus({ preventScroll: true });
-    }
-}
-
-function closeCityPanel() {
-    els.citySheet.classList.remove('open');
-    if (!els.sheet.classList.contains('open')) {
-        els.sheetBackdrop.classList.remove('show');
-    }
-}
-
-// ========== 城市选择面板 ==========
-function renderCityGrid() {
-    if (!els.cityGrid) return;
-    const q = (els.citySearchInput ? els.citySearchInput.value : '').trim();
-    const cities = window._cityData || [];
-    const matched = q ? cities.filter(c => (c.city || '').includes(q)) : cities;
-    els.cityGrid.innerHTML = '';
-    if (!q) {
-        els.cityGrid.appendChild(makeCityCell('🌍', '全部城市', ''));
-    }
-    matched.forEach(c => {
-        const emoji = CITY_EMOJI_MAP[c.city] || '📍';
-        els.cityGrid.appendChild(makeCityCell(emoji, c.city, c.city));
-    });
-    if (!els.cityGrid.children.length) {
-        const empty = document.createElement('div');
-        empty.className = 'h-empty';
-        empty.style.gridColumn = '1 / -1';
-        empty.textContent = '未找到相关城市';
-        els.cityGrid.appendChild(empty);
-    }
-}
-
-function makeCityCell(emoji, label, value) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'city-cell' + (currentCity === value ? ' active' : '');
-    b.dataset.city = value || '';
-    b.innerHTML = `<span class="city-cell-emoji">${emoji}</span><span>${escapeHtml(label)}</span>`;
-    return b;
 }
 
 // ========== 工具函数 ==========

@@ -91,9 +91,6 @@
 
                 <!-- 底部操作区 -->
                 <footer class="composer">
-                    <!-- 城市快捷筛选 -->
-                    <div class="chip-scroll" id="city-chips"><!-- 城市 chips 由 JS 动态生成 --></div>
-
                     <!-- 检索方式 -->
                     <div class="method-toggle" id="method-toggle" role="group" aria-label="选择检索方式">
                         <button type="button" class="method-option active" data-method="bm25">BM25</button>
@@ -298,20 +295,6 @@
                 <button type="button" class="sheet-clear" id="history-clear">清空记录</button>
             </div>
             <div class="sheet-list" id="history-list"></div>
-        </section>
-
-        <!-- ========== 城市选择面板（chips 行右滑 / 点击「更多」展开） ========== -->
-        <section class="bottom-sheet city-sheet" id="city-sheet" aria-label="选择城市">
-            <div class="sheet-handle"></div>
-            <div class="sheet-head">
-                <h3>选择城市</h3>
-                <button type="button" class="sheet-clear" id="city-panel-close">完成</button>
-            </div>
-            <div class="city-search">
-                <input type="text" id="city-search-input" placeholder="🔍 搜索城市…" autocomplete="off"
-                    maxlength="30">
-            </div>
-            <div class="sheet-list city-grid" id="city-grid"></div>
         </section>
 
         <!-- ========== 登录弹窗 ========== -->
