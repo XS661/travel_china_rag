@@ -8,6 +8,7 @@ from .. import config
 from ..city_detector import COVERED_CITIES, extract_city_from_text
 from ..conversation_store import (
     append_message,
+    create_session,
     extract_context,
     get_last_city,
     get_or_create_session,
@@ -120,14 +121,17 @@ async def ask_question(req: AskRequest):
     history_messages = []
     context_cities: list[str] = []
 
-    # 1. 会话管理：有 session_id 则关联，无则创建新会话
+    # 1. 会话管理：无论前端是否传了 session_id，都确保有一个可用的
     if req.session_id:
         session_id = get_or_create_session(req.session_id, user_id=req.user_id)
-        raw_history = get_recent_messages(session_id, max_turns=config.MAX_HISTORY_TURNS)
-        if raw_history:
-            history_messages = _build_history_for_llm(raw_history)
-            ctx = extract_context(raw_history)
-            context_cities = ctx["cities"]
+    else:
+        session_id = create_session(user_id=req.user_id)
+
+    raw_history = get_recent_messages(session_id, max_turns=config.MAX_HISTORY_TURNS)
+    if raw_history:
+        history_messages = _build_history_for_llm(raw_history)
+        ctx = extract_context(raw_history)
+        context_cities = ctx["cities"]
 
     # 2. 城市识别（前端 → 问题文本 → 会话上下文，三级回退）
     detected_city = city if city else extract_city_from_text(question)
@@ -200,19 +204,18 @@ async def ask_question(req: AskRequest):
     relevant_results = filter_relevant_sources(search_results, answer)
     sources = [_source_from_result(r) for r in relevant_results]
 
-    # 8. 保存本轮对话到会话（如果启用了 session）
-    if session_id:
-        append_message(session_id, "user", question, detected_city=detected_city)
-        append_message(
-            session_id,
-            "assistant",
-            answer,
-            detected_city=detected_city,
-            sources=[
-                {"title": s.title, "source": s.source, "city": s.city}
-                for s in relevant_results
-            ],
-        )
+    # 8. 保存本轮对话到会话
+    append_message(session_id, "user", question, detected_city=detected_city)
+    append_message(
+        session_id,
+        "assistant",
+        answer,
+        detected_city=detected_city,
+        sources=[
+            {"title": s.title, "source": s.source, "city": s.city}
+            for s in relevant_results
+        ],
+    )
 
     return AskResponse(
         question=question,
