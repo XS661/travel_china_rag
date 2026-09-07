@@ -1221,6 +1221,9 @@ async function showMeSection() {
     const hasSection = currentMeSection !== null;
     els.meMap.hidden = hasSection;
     els.meContent.hidden = !hasSection;
+    // 退出登录只在“我的”默认的中国地图视图下显示；
+    // 进入历史记录 / 关注列表 / 我的投稿后隐藏，避免它随内容一起滚动。
+    els.meLogout.hidden = hasSection || !getToken();
     els.meTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.section === currentMeSection));
 
     if (hasSection) {
