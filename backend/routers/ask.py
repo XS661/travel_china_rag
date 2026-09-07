@@ -154,15 +154,18 @@ async def ask_question(req: AskRequest):
         method=method,
     )
 
-    # 4. 检索无结果 → 返回提示
+    # 4. 检索无结果 → 返回提示（仍保存对话以维持上下文）
     if not search_results and not req.raw:
+        no_result_answer = (
+            f"该地区暂未收录，当前已覆盖城市：{', '.join(COVERED_CITIES)}。\n"
+            f"请尝试搜索以上城市的相关问题。"
+        )
+        append_message(session_id, "user", question, detected_city=detected_city)
+        append_message(session_id, "assistant", no_result_answer, detected_city=detected_city)
         return AskResponse(
             question=question,
             detected_city=detected_city,
-            answer=(
-                f"该地区暂未收录，当前已覆盖城市：{', '.join(COVERED_CITIES)}。\n"
-                f"请尝试搜索以上城市的相关问题。"
-            ),
+            answer=no_result_answer,
             sources=[],
             retrieval_method=method,
             model="none",
@@ -172,6 +175,7 @@ async def ask_question(req: AskRequest):
 
     # 5. 原始检索模式（对比模式使用）：只返回检索结果，不调用 LLM
     if req.raw:
+        append_message(session_id, "user", question, detected_city=detected_city)
         return AskResponse(
             question=question,
             detected_city=detected_city,
@@ -213,7 +217,7 @@ async def ask_question(req: AskRequest):
         detected_city=detected_city,
         sources=[
             {"title": s.title, "source": s.source, "city": s.city}
-            for s in relevant_results
+            for s in sources
         ],
     )
 
