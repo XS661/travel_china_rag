@@ -322,15 +322,17 @@ function renderCityMarquee(cityNames) {
         : ['北京', '上海', '成都', '杭州', '西安', '广州', '重庆', '苏州'];
     const shuffled = [...names].sort(() => Math.random() - 0.5);
 
-    const half = shuffled.map((city, index) => {
-        const altClass = index % 2 === 0 ? '' : ' city-marquee-item--alt';
-        return `<span class="city-marquee-item${altClass}">${escapeHtml(city)}</span><span class="city-marquee-sep" aria-hidden="true">✦</span>`;
-    }).join('');
+    const half = shuffled.map((city) =>
+        `<span class="city-marquee-item">${escapeHtml(city)}</span><span class="city-marquee-sep" aria-hidden="true"></span>`
+    ).join('');
 
-    container.innerHTML = `<div class="city-marquee-track">${half}${half}</div>`;
+    const track = container.querySelector('.city-marquee-track');
+    if (track) track.innerHTML = half + half;
+
+    const label = container.querySelector('#city-marquee-label');
+    if (label) label.textContent = `已覆盖 ${names.length} 城`;
 
     const duration = Math.max(32, shuffled.length * 0.72);
-    const track = container.querySelector('.city-marquee-track');
     if (track) track.style.animationDuration = `${duration}s`;
 }
 
