@@ -1689,6 +1689,7 @@ function renderMapToolbar(toolbar, provinceName, provinceHasPosts) {
 }
 
 function renderMeSection() {
+    els.meContent.dataset.section = currentMeSection || '';
     if (currentMeSection === 'history') {
         renderHistoryInto(els.meContent, { navigateHome: true });
     } else if (currentMeSection === 'follows') {

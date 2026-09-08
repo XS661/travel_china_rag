@@ -2828,6 +2828,7 @@
 
             /* ---------- 我的页 ---------- */
             .me-user-card,
+            .me-map-card,
             .me-tabs,
             .me-content,
             .me-logout {
@@ -2836,10 +2837,42 @@
                 margin-inline: auto;
             }
 
+            /* 地图：固定居中高度、按 1000:720 等比缩放，不再被压扁变形 */
+            #china-map {
+                width: auto;
+                max-width: 100%;
+                height: min(52vh, 560px);
+                max-height: none;
+                margin-inline: auto;
+            }
+
             .me-content {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
                 gap: 12px;
+            }
+
+            /* 二级目录：历史记录 / 关注列表 → 单列列表（投稿保持卡片网格） */
+            #me-content[data-section="history"],
+            #me-content[data-section="follows"] {
+                grid-template-columns: 1fr;
+                max-width: 900px;
+            }
+
+            #me-content[data-section="history"] .history-item {
+                padding: 13px 15px;
+                border: 1px solid var(--stroke);
+                background: rgba(255, 255, 255, 0.03);
+            }
+
+            #me-content[data-section="follows"] .follow-actions {
+                flex-direction: row;
+            }
+
+            /* 投稿列表：返回链接与分组标题占满整行 */
+            .me-content .map-back-link,
+            .me-content .province-posts-head {
+                grid-column: 1 / -1;
             }
 
             .me-content>* {
